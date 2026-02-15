@@ -1,5 +1,13 @@
 # Whisper-AI
 
+## Screenshots
+
+![Overlay (Idle)](images/overlay-idle.png)
+![Overlay (Recording)](images/overlay-recording.png)
+![Preferences (General)](images/preferences-general.png)
+![Preferences (API)](images/preferences-api.png)
+![Permissions](images/permissions.png)
+
 Whisper-AI is a macOS dictation app that records your voice, transcribes it with OpenRouter models, cleans the output, and pastes text into the active app.
 
 ## Features
