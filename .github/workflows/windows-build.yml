@@ -47,17 +47,32 @@ jobs:
         run: |
           $version = if ("${{ github.ref_type }}" -eq "tag") { "${{ github.ref_name }}" } else { "dev-${{ github.sha }}" }
           $zipName = "Hola-AI-Windows-x64-$version.zip"
+          $exeName = "Hola-AI-Windows-x64-$version.exe"
+          $sourceExe = Join-Path $env:PUBLISH_DIR "HolaAI.Windows.exe"
+          if (!(Test-Path $sourceExe)) {
+            $sourceExe = Get-ChildItem -Path $env:PUBLISH_DIR -Filter *.exe | Select-Object -First 1 -ExpandProperty FullName
+          }
+          if (!(Test-Path $sourceExe)) {
+            throw "Published EXE not found in $env:PUBLISH_DIR"
+          }
+          $exePath = Join-Path $env:RUNNER_TEMP $exeName
+          Copy-Item -Path $sourceExe -Destination $exePath -Force
           Compress-Archive -Path "$env:PUBLISH_DIR\*" -DestinationPath "$env:RUNNER_TEMP\$zipName" -Force
+          "EXE_PATH=$exePath" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
           "ZIP_PATH=$env:RUNNER_TEMP\$zipName" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
 
       - name: Upload workflow artifact
         uses: actions/upload-artifact@v4
         with:
           name: hola-ai-windows-x64
-          path: ${{ env.ZIP_PATH }}
+          path: |
+            ${{ env.EXE_PATH }}
+            ${{ env.ZIP_PATH }}
 
       - name: Upload to GitHub Release (tag only)
         if: github.ref_type == 'tag'
         uses: softprops/action-gh-release@v2
         with:
-          files: ${{ env.ZIP_PATH }}
+          files: |
+            ${{ env.EXE_PATH }}
+            ${{ env.ZIP_PATH }}
