@@ -11,6 +11,7 @@ This folder contains a Windows desktop scaffold for Hola-AI.
 ## Current status
 
 - Overlay window scaffolded (draggable, always-on-top style)
+- Overlay includes a settings gear button to configure API/model fields
 - Model/config structures scaffolded
 - Service layer scaffolded for:
 - Global hotkeys
@@ -19,6 +20,15 @@ This folder contains a Windows desktop scaffold for Hola-AI.
 - Text insertion into active app
 
 This is an MVP starter and needs feature completion + hardening before production.
+
+## Configuration (current)
+
+Click the gear button in the overlay and set:
+
+- OpenRouter API key
+- STT model
+- Prompt model
+- Show overlay on startup
 
 ## Build on Windows
 

@@ -10,6 +10,7 @@ public partial class MainWindow : Window
 {
     private readonly OverlayViewModel _viewModel = new();
     private readonly GlobalHotkeyService _hotkeyService = new();
+    private readonly SettingsService _settingsService = new();
     private readonly DictationManager _dictationManager;
 
     public MainWindow()
@@ -21,7 +22,7 @@ public partial class MainWindow : Window
             new AudioCaptureService(),
             new OpenRouterClient(),
             new TextInsertionService(),
-            new SettingsService());
+            _settingsService);
 
         _dictationManager.AudioLevelChanged += level => { /* TODO: bind level meter */ };
         _dictationManager.TranscriptionReady += text =>
@@ -81,6 +82,15 @@ public partial class MainWindow : Window
     private void CloseButton_OnClick(object sender, RoutedEventArgs e)
     {
         Close();
+    }
+
+    private void SettingsButton_OnClick(object sender, RoutedEventArgs e)
+    {
+        var settingsWindow = new SettingsWindow(_settingsService)
+        {
+            Owner = this
+        };
+        settingsWindow.ShowDialog();
     }
 
     private void Root_OnMouseLeftButtonDown(object sender, MouseButtonEventArgs e)

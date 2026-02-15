@@ -6,18 +6,99 @@
         xmlns:primitives="clr-namespace:System.Windows.Controls.Primitives;assembly=PresentationFramework"
         mc:Ignorable="d"
         Title="Hola-AI Overlay"
-        Width="330"
-        Height="120"
+        Width="380"
+        Height="130"
         WindowStyle="None"
         ResizeMode="NoResize"
         AllowsTransparency="True"
         Background="Transparent"
         Topmost="True"
         ShowInTaskbar="False">
+    <Window.Resources>
+        <Style x:Key="CircleButtonStyle" TargetType="Button">
+            <Setter Property="Width" Value="42" />
+            <Setter Property="Height" Value="42" />
+            <Setter Property="Margin" Value="0,0,8,0" />
+            <Setter Property="Foreground" Value="#1E1E1E" />
+            <Setter Property="Background" Value="#F2FFFFFF" />
+            <Setter Property="BorderBrush" Value="#66FFFFFF" />
+            <Setter Property="BorderThickness" Value="1" />
+            <Setter Property="Cursor" Value="Hand" />
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border x:Name="Root"
+                                Width="{TemplateBinding Width}"
+                                Height="{TemplateBinding Height}"
+                                Background="{TemplateBinding Background}"
+                                BorderBrush="{TemplateBinding BorderBrush}"
+                                BorderThickness="{TemplateBinding BorderThickness}"
+                                CornerRadius="21">
+                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center" />
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="Root" Property="Opacity" Value="0.9" />
+                            </Trigger>
+                            <Trigger Property="IsPressed" Value="True">
+                                <Setter TargetName="Root" Property="Opacity" Value="0.8" />
+                            </Trigger>
+                            <Trigger Property="IsEnabled" Value="False">
+                                <Setter TargetName="Root" Property="Opacity" Value="0.45" />
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <Style x:Key="CircleToggleStyle" TargetType="primitives:ToggleButton">
+            <Setter Property="Width" Value="42" />
+            <Setter Property="Height" Value="42" />
+            <Setter Property="Margin" Value="0,0,8,0" />
+            <Setter Property="Foreground" Value="#1E1E1E" />
+            <Setter Property="Background" Value="#F2FFFFFF" />
+            <Setter Property="BorderBrush" Value="#66FFFFFF" />
+            <Setter Property="BorderThickness" Value="1" />
+            <Setter Property="Cursor" Value="Hand" />
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="primitives:ToggleButton">
+                        <Border x:Name="Root"
+                                Width="{TemplateBinding Width}"
+                                Height="{TemplateBinding Height}"
+                                Background="{TemplateBinding Background}"
+                                BorderBrush="{TemplateBinding BorderBrush}"
+                                BorderThickness="{TemplateBinding BorderThickness}"
+                                CornerRadius="21">
+                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center" />
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsChecked" Value="True">
+                                <Setter TargetName="Root" Property="Background" Value="#FF2D8CFF" />
+                                <Setter TargetName="Root" Property="BorderBrush" Value="#FF2D8CFF" />
+                                <Setter Property="Foreground" Value="White" />
+                            </Trigger>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="Root" Property="Opacity" Value="0.9" />
+                            </Trigger>
+                            <Trigger Property="IsPressed" Value="True">
+                                <Setter TargetName="Root" Property="Opacity" Value="0.8" />
+                            </Trigger>
+                            <Trigger Property="IsEnabled" Value="False">
+                                <Setter TargetName="Root" Property="Opacity" Value="0.45" />
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+    </Window.Resources>
+
     <Grid MouseLeftButtonDown="Root_OnMouseLeftButtonDown">
         <Border CornerRadius="22"
-                Background="#11000000"
-                BorderBrush="#20FFFFFF"
+                Background="#12000000"
+                BorderBrush="#1FFFFFFF"
                 BorderThickness="1"
                 Padding="14,10">
             <DockPanel LastChildFill="False">
@@ -36,33 +117,47 @@
                 <StackPanel Orientation="Horizontal"
                             HorizontalAlignment="Left"
                             VerticalAlignment="Center">
-                    <Button Width="40"
-                            Height="40"
-                            Margin="0,0,8,0"
+                    <Button Style="{StaticResource CircleButtonStyle}"
                             Click="RecordButton_OnClick"
-                            Content="🎤"
-                            ToolTip="Start/Stop dictation"/>
+                            ToolTip="Start/Stop dictation">
+                        <TextBlock FontFamily="Segoe MDL2 Assets"
+                                   FontSize="16"
+                                   Text="&#xE720;" />
+                    </Button>
 
-                    <primitives:ToggleButton Width="40"
-                                             Height="40"
-                                             Margin="0,0,8,0"
+                    <primitives:ToggleButton Style="{StaticResource CircleToggleStyle}"
                                              IsChecked="{Binding IsPromptMode}"
                                              ToolTip="Enhanced prompt mode"
-                                             Content="✦"/>
+                                             Background="#FFFFB347"
+                                             BorderBrush="#FFFFB347"
+                                             Foreground="White">
+                        <TextBlock FontFamily="Segoe MDL2 Assets"
+                                   FontSize="15"
+                                   Text="&#xE734;" />
+                    </primitives:ToggleButton>
 
-                    <primitives:ToggleButton Width="40"
-                                             Height="40"
-                                             Margin="0,0,8,0"
+                    <primitives:ToggleButton Style="{StaticResource CircleToggleStyle}"
                                              IsChecked="{Binding TranslateToEnglish}"
                                              ToolTip="Translate to English"
-                                             Content="🇺🇸/🇬🇧"/>
+                                             Content="EN"/>
 
-                    <Button Width="40"
-                            Height="40"
+                    <Button Style="{StaticResource CircleButtonStyle}"
                             IsEnabled="{Binding CanCopyLastText}"
                             Click="CopyButton_OnClick"
-                            Content="⧉"
-                            ToolTip="Copy last text"/>
+                            ToolTip="Copy last text">
+                        <TextBlock FontFamily="Segoe MDL2 Assets"
+                                   FontSize="15"
+                                   Text="&#xE16F;" />
+                    </Button>
+
+                    <Button Style="{StaticResource CircleButtonStyle}"
+                            Margin="0"
+                            Click="SettingsButton_OnClick"
+                            ToolTip="Open settings">
+                        <TextBlock FontFamily="Segoe MDL2 Assets"
+                                   FontSize="15"
+                                   Text="&#xE115;" />
+                    </Button>
                 </StackPanel>
             </DockPanel>
         </Border>
