@@ -30,7 +30,7 @@ Whisper-AI is a macOS dictation app that records your voice, transcribes it with
 
 ## Install (Prebuilt App in This Repo)
 
-1. Download `releases/Whisper-AI-1.0.0.dmg` from this repository.
+1. Download the latest DMG from [GitHub Releases](https://github.com/jbeltran73-2/whisper-ai/releases/latest).
 2. Open it and drag `Whisper-AI.app` to `Applications`.
 3. Open `Whisper-AI` (first launch may require right-click -> Open).
 4. Grant permissions: Microphone and Accessibility.
