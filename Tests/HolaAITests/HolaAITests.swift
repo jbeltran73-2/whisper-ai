@@ -1,7 +1,7 @@
 import XCTest
-@testable import WhisperAI
+@testable import HolaAI
 
-final class WhisperAITests: XCTestCase {
+final class HolaAITests: XCTestCase {
     func testExample() throws {
         // Placeholder test
         XCTAssertTrue(true)

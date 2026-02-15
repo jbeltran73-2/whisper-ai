@@ -30,7 +30,7 @@ mkdir -p "$APP_BUNDLE/Contents/MacOS"
 mkdir -p "$APP_BUNDLE/Contents/Resources"
 
 # Copy executable
-cp "$BUILD_DIR/WhisperAI" "$APP_BUNDLE/Contents/MacOS/$APP_NAME"
+cp "$BUILD_DIR/HolaAI" "$APP_BUNDLE/Contents/MacOS/$APP_NAME"
 
 # Create Info.plist
 cat > "$APP_BUNDLE/Contents/Info.plist" << EOF
@@ -71,8 +71,8 @@ cat > "$APP_BUNDLE/Contents/Info.plist" << EOF
 EOF
 
 # Copy app icon
-if [ -f "$PROJECT_DIR/Sources/WhisperAI/Resources/AppIcon.icns" ]; then
-    cp "$PROJECT_DIR/Sources/WhisperAI/Resources/AppIcon.icns" "$APP_BUNDLE/Contents/Resources/"
+if [ -f "$PROJECT_DIR/Sources/HolaAI/Resources/AppIcon.icns" ]; then
+    cp "$PROJECT_DIR/Sources/HolaAI/Resources/AppIcon.icns" "$APP_BUNDLE/Contents/Resources/"
     echo "📎 Added app icon"
 fi
 
@@ -94,8 +94,8 @@ cat > "$DIST_DIR/entitlements.plist" << EOF
 EOF
 
 # Copy any resources if they exist
-if [ -d "$PROJECT_DIR/Sources/WhisperAI/Resources" ]; then
-    cp -r "$PROJECT_DIR/Sources/WhisperAI/Resources"/* "$APP_BUNDLE/Contents/Resources/" 2>/dev/null || true
+if [ -d "$PROJECT_DIR/Sources/HolaAI/Resources" ]; then
+    cp -r "$PROJECT_DIR/Sources/HolaAI/Resources"/* "$APP_BUNDLE/Contents/Resources/" 2>/dev/null || true
 fi
 
 echo "🔏 Signing app (ad-hoc)..."

@@ -17,7 +17,7 @@ let sizes: [(Int, String)] = [
     (1024, "icon_512x512@2x.png")
 ]
 
-let outputDir = FileManager.default.currentDirectoryPath + "/Sources/WhisperAI/Resources/AppIcon.iconset"
+let outputDir = FileManager.default.currentDirectoryPath + "/Sources/HolaAI/Resources/AppIcon.iconset"
 
 // Create directory if needed
 try? FileManager.default.createDirectory(atPath: outputDir, withIntermediateDirectories: true)
@@ -70,4 +70,4 @@ for (size, filename) in sizes {
     }
 }
 
-print("\nNow run: iconutil -c icns \(outputDir) -o Sources/WhisperAI/Resources/AppIcon.icns")
+print("\nNow run: iconutil -c icns \(outputDir) -o Sources/HolaAI/Resources/AppIcon.icns")

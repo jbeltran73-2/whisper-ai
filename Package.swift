@@ -3,14 +3,14 @@
 import PackageDescription
 
 let package = Package(
-    name: "WhisperAI",
+    name: "HolaAI",
     platforms: [
         .macOS(.v13)
     ],
     products: [
         .executable(
-            name: "WhisperAI",
-            targets: ["WhisperAI"]
+            name: "HolaAI",
+            targets: ["HolaAI"]
         )
     ],
     dependencies: [
@@ -18,17 +18,17 @@ let package = Package(
     ],
     targets: [
         .executableTarget(
-            name: "WhisperAI",
+            name: "HolaAI",
             dependencies: [],
-            path: "Sources/WhisperAI",
+            path: "Sources/HolaAI",
             resources: [
                 .process("Resources")
             ]
         ),
         .testTarget(
-            name: "WhisperAITests",
-            dependencies: ["WhisperAI"],
-            path: "Tests/WhisperAITests"
+            name: "HolaAITests",
+            dependencies: ["HolaAI"],
+            path: "Tests/HolaAITests"
         )
     ]
 )

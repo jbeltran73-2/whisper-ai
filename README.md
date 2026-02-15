@@ -61,7 +61,7 @@ swift build
 Run:
 
 ```bash
-swift run WhisperAI
+swift run HolaAI
 ```
 
 Package app + DMG:
