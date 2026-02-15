@@ -4,7 +4,7 @@
 
 <table>
   <tr>
-    <td colspan="2" align="center"><img src="images/overlay-recording.png" alt="Overlay Recording" width="420"></td>
+    <td colspan="2" align="center"><img src="images/oeverlay-recording.png" alt="Overlay Recording" width="420"></td>
   </tr>
   <tr>
     <td><img src="images/preferences-general.png" alt="Preferences General" width="320"></td>
