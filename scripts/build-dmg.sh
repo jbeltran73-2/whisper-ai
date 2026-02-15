@@ -4,7 +4,7 @@ set -e
 # Configuration
 APP_NAME="Hola-AI"
 BUNDLE_ID="com.holaai.app"
-VERSION="1.0.3"
+VERSION="1.0.6"
 SIGN_IDENTITY="${SIGN_IDENTITY:--}"
 NOTARY_PROFILE="${NOTARY_PROFILE:-}"
 
