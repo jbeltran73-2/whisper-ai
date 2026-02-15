@@ -4,7 +4,9 @@ set -e
 # Configuration
 APP_NAME="Hola-AI"
 BUNDLE_ID="com.holaai.app"
-VERSION="1.0.2"
+VERSION="1.0.3"
+SIGN_IDENTITY="${SIGN_IDENTITY:--}"
+NOTARY_PROFILE="${NOTARY_PROFILE:-}"
 
 # Directories
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -98,10 +100,18 @@ if [ -d "$PROJECT_DIR/Sources/HolaAI/Resources" ]; then
     cp -r "$PROJECT_DIR/Sources/HolaAI/Resources"/* "$APP_BUNDLE/Contents/Resources/" 2>/dev/null || true
 fi
 
-echo "🔏 Signing app (ad-hoc)..."
-
-# Sign with ad-hoc signature to avoid "damaged" error
-codesign --force --deep --sign - --entitlements "$DIST_DIR/entitlements.plist" "$APP_BUNDLE"
+if [ "$SIGN_IDENTITY" = "-" ]; then
+    echo "🔏 Signing app (ad-hoc)..."
+    # Ad-hoc signature for local/testing builds
+    codesign --force --deep --sign - --entitlements "$DIST_DIR/entitlements.plist" "$APP_BUNDLE"
+else
+    echo "🔏 Signing app with Developer ID identity: $SIGN_IDENTITY"
+    # Keep microphone/apple-events entitlements while signing for distribution
+    codesign --force --deep --options runtime --timestamp \
+      --sign "$SIGN_IDENTITY" \
+      --entitlements "$DIST_DIR/entitlements.plist" \
+      "$APP_BUNDLE"
+fi
 
 # Remove quarantine attribute just in case
 xattr -cr "$APP_BUNDLE"
@@ -147,6 +157,19 @@ EOF
 
 # Create DMG using hdiutil
 hdiutil create -volname "$APP_NAME" -srcfolder "$DMG_TEMP" -ov -format UDZO "$DMG_PATH"
+
+# Optional notarization (requires Developer ID signing)
+if [ -n "$NOTARY_PROFILE" ]; then
+    if [ "$SIGN_IDENTITY" = "-" ]; then
+        echo "❌ NOTARY_PROFILE is set but SIGN_IDENTITY is ad-hoc. Use a Developer ID identity."
+        exit 1
+    fi
+    echo "🧾 Submitting DMG for notarization using profile: $NOTARY_PROFILE"
+    xcrun notarytool submit "$DMG_PATH" --keychain-profile "$NOTARY_PROFILE" --wait
+    echo "📌 Stapling notarization ticket..."
+    xcrun stapler staple "$DMG_PATH"
+    xcrun stapler validate "$DMG_PATH"
+fi
 
 # Cleanup
 rm -rf "$DMG_TEMP"
