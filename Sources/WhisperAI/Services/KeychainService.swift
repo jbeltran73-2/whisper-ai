@@ -7,9 +7,10 @@ import os.log
 final class KeychainService: Sendable {
     @MainActor static let shared = KeychainService()
 
-    private let logger = Logger(subsystem: "com.whisperai.app", category: "Keychain")
+    private let logger = Logger(subsystem: "com.holaai.app", category: "Keychain")
 
-    private let service = "com.whisperai.app"
+    private let primaryService = "com.holaai.app"
+    private let legacyServices = ["com.whisperai.app"]
     private let openRouterKeyAccount = "openrouter-api-key"
     private let legacyOpenAIKeyAccount = "openai-api-key"
 
@@ -32,7 +33,7 @@ final class KeychainService: Sendable {
 
         let query: [String: Any] = [
             kSecClass as String: kSecClassGenericPassword,
-            kSecAttrService as String: service,
+            kSecAttrService as String: primaryService,
             kSecAttrAccount as String: openRouterKeyAccount,
             kSecValueData as String: data,
             kSecAttrAccessible as String: kSecAttrAccessibleWhenUnlockedThisDeviceOnly
@@ -59,6 +60,20 @@ final class KeychainService: Sendable {
     }
 
     private func getKey(for account: String) -> String? {
+        if let key = getKey(for: account, service: primaryService) {
+            return key
+        }
+
+        for service in legacyServices {
+            if let key = getKey(for: account, service: service) {
+                return key
+            }
+        }
+
+        return nil
+    }
+
+    private func getKey(for account: String, service: String) -> String? {
         let query: [String: Any] = [
             kSecClass as String: kSecClassGenericPassword,
             kSecAttrService as String: service,
@@ -85,19 +100,22 @@ final class KeychainService: Sendable {
     /// - Returns: True if deleted successfully
     @discardableResult
     func deleteAPIKey() -> Bool {
-        let statusOpenRouter = deleteKey(for: openRouterKeyAccount)
-        let statusLegacy = deleteKey(for: legacyOpenAIKeyAccount)
+        var statuses: [OSStatus] = []
+        let services = [primaryService] + legacyServices
 
-        if statusOpenRouter == errSecSuccess || statusOpenRouter == errSecItemNotFound,
-           statusLegacy == errSecSuccess || statusLegacy == errSecItemNotFound {
-            return true
+        for service in services {
+            statuses.append(deleteKey(for: openRouterKeyAccount, service: service))
+            statuses.append(deleteKey(for: legacyOpenAIKeyAccount, service: service))
         }
 
-        logger.error("Failed to delete API key")
-        return false
+        let allDeleted = statuses.allSatisfy { $0 == errSecSuccess || $0 == errSecItemNotFound }
+        if !allDeleted {
+            logger.error("Failed to delete API key")
+        }
+        return allDeleted
     }
 
-    private func deleteKey(for account: String) -> OSStatus {
+    private func deleteKey(for account: String, service: String) -> OSStatus {
         let query: [String: Any] = [
             kSecClass as String: kSecClassGenericPassword,
             kSecAttrService as String: service,

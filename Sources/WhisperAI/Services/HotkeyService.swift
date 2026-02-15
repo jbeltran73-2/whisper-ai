@@ -7,7 +7,7 @@ import os.log
 final class HotkeyService {
     static let shared = HotkeyService()
 
-    private let logger = Logger(subsystem: "com.whisperai.app", category: "Hotkey")
+    private let logger = Logger(subsystem: "com.holaai.app", category: "Hotkey")
 
     /// Callback when dictation should start (Fn pressed)
     var onDictationStart: (() -> Void)?

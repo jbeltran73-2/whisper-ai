@@ -2,8 +2,8 @@
 set -e
 
 # Configuration
-APP_NAME="Whisper-AI"
-BUNDLE_ID="com.whisperai.app"
+APP_NAME="Hola-AI"
+BUNDLE_ID="com.holaai.app"
 VERSION="1.0.0"
 
 # Directories
@@ -45,7 +45,7 @@ cat > "$APP_BUNDLE/Contents/Info.plist" << EOF
     <key>CFBundleName</key>
     <string>$APP_NAME</string>
     <key>CFBundleDisplayName</key>
-    <string>Whisper-AI</string>
+    <string>Hola-AI</string>
     <key>CFBundleVersion</key>
     <string>$VERSION</string>
     <key>CFBundleShortVersionString</key>
@@ -63,9 +63,9 @@ cat > "$APP_BUNDLE/Contents/Info.plist" << EOF
     <key>NSHighResolutionCapable</key>
     <true/>
     <key>NSMicrophoneUsageDescription</key>
-    <string>Whisper-AI needs access to your microphone to transcribe your speech.</string>
+    <string>Hola-AI needs access to your microphone to transcribe your speech.</string>
     <key>NSAppleEventsUsageDescription</key>
-    <string>Whisper-AI needs accessibility access to insert transcribed text into other applications.</string>
+    <string>Hola-AI needs accessibility access to insert transcribed text into other applications.</string>
 </dict>
 </plist>
 EOF
@@ -122,12 +122,12 @@ ln -s /Applications "$DMG_TEMP/Applications"
 
 # Create README
 cat > "$DMG_TEMP/README.txt" << EOF
-Whisper-AI - Voice Dictation App
+Hola-AI - Voice Dictation App
 ================================
 
 Installation:
-1. Drag Whisper-AI.app to the Applications folder
-2. Open Whisper-AI from Applications
+1. Drag Hola-AI.app to the Applications folder
+2. Open Hola-AI from Applications
 3. The app will appear in your menu bar (top right)
 4. Click the icon → Preferences to add your OpenRouter API key
 5. Grant microphone and accessibility permissions when prompted

@@ -89,7 +89,7 @@ private final class AudioBuffer: @unchecked Sendable {
 /// Service responsible for capturing audio from the microphone
 /// Uses AVAudioEngine with in-memory buffer to avoid Swift 6 concurrency issues
 final class AudioCaptureService: NSObject, @unchecked Sendable {
-    private let logger = Logger(subsystem: "com.whisperai.app", category: "AudioCapture")
+    private let logger = Logger(subsystem: "com.holaai.app", category: "AudioCapture")
 
     private var audioEngine: AVAudioEngine?
     private var audioBuffer: AudioBuffer?

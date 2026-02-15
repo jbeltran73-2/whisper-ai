@@ -34,7 +34,7 @@ private struct GPTResponse: Decodable {
 /// Removes filler words, adds punctuation, and applies capitalization
 @MainActor
 final class TextProcessingService {
-    private let logger = Logger(subsystem: "com.whisperai.app", category: "TextProcessing")
+    private let logger = Logger(subsystem: "com.holaai.app", category: "TextProcessing")
     private let gptEndpoint = "https://openrouter.ai/api/v1/chat/completions"
 
     /// Whether to use LLM enhancement (punctuation + capitalization)
@@ -298,7 +298,7 @@ final class TextProcessingService {
         var request = URLRequest(url: URL(string: gptEndpoint)!)
         request.httpMethod = "POST"
         request.setValue("Bearer \(apiKey)", forHTTPHeaderField: "Authorization")
-        request.setValue("Whisper-AI", forHTTPHeaderField: "X-Title")
+        request.setValue("Hola-AI", forHTTPHeaderField: "X-Title")
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
         request.httpBody = try JSONSerialization.data(withJSONObject: requestBody)
 
@@ -369,7 +369,7 @@ final class TextProcessingService {
         var request = URLRequest(url: URL(string: gptEndpoint)!)
         request.httpMethod = "POST"
         request.setValue("Bearer \(apiKey)", forHTTPHeaderField: "Authorization")
-        request.setValue("Whisper-AI", forHTTPHeaderField: "X-Title")
+        request.setValue("Hola-AI", forHTTPHeaderField: "X-Title")
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
         request.httpBody = try JSONSerialization.data(withJSONObject: requestBody)
 
@@ -498,7 +498,7 @@ final class TextProcessingService {
         var request = URLRequest(url: URL(string: gptEndpoint)!)
         request.httpMethod = "POST"
         request.setValue("Bearer \(apiKey)", forHTTPHeaderField: "Authorization")
-        request.setValue("Whisper-AI", forHTTPHeaderField: "X-Title")
+        request.setValue("Hola-AI", forHTTPHeaderField: "X-Title")
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
         request.httpBody = try? JSONSerialization.data(withJSONObject: requestBody)
 

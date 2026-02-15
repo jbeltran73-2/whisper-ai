@@ -96,7 +96,7 @@ struct PreferencesView: View {
                     .onChange(of: showDockIcon) { newValue in
                         saveShowDockIcon(newValue)
                     }
-                    .help("Keep Whisper-AI visible in the Dock while running.")
+                    .help("Keep Hola-AI visible in the Dock while running.")
             } header: {
                 Text("Dictation")
             }

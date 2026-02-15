@@ -6,7 +6,7 @@ import os.log
 final class DictationManager: AudioCaptureDelegate {
     static let shared = DictationManager()
 
-    private let logger = Logger(subsystem: "com.whisperai.app", category: "DictationManager")
+    private let logger = Logger(subsystem: "com.holaai.app", category: "DictationManager")
     private let audioCapture = AudioCaptureService()
     private let transcriptionService = TranscriptionService()
     private let textProcessingService = TextProcessingService()

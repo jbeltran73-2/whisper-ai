@@ -23,7 +23,7 @@ enum TextInsertionError: Error, LocalizedError {
 /// Service responsible for inserting text into the currently focused text field
 @MainActor
 final class TextInsertionService {
-    private let logger = Logger(subsystem: "com.whisperai.app", category: "TextInsertion")
+    private let logger = Logger(subsystem: "com.holaai.app", category: "TextInsertion")
 
     /// Check if Accessibility permission is granted
     var hasAccessibilityPermission: Bool {
@@ -48,7 +48,7 @@ final class TextInsertionService {
 
         if !hasPermission {
             print("❌ [TextInsertion] Cannot insert text without Accessibility permission!")
-            print("💡 [TextInsertion] Go to: System Settings → Privacy & Security → Accessibility → Enable Whisper-AI")
+            print("💡 [TextInsertion] Go to: System Settings → Privacy & Security → Accessibility → Enable Hola-AI")
             throw TextInsertionError.accessibilityNotGranted
         }
 

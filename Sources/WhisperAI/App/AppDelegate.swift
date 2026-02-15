@@ -50,7 +50,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
 
         if let button = statusItem?.button {
-            button.image = NSImage(systemSymbolName: "waveform.circle.fill", accessibilityDescription: "Whisper-AI")
+            button.image = NSImage(systemSymbolName: "waveform.circle.fill", accessibilityDescription: "Hola-AI")
             button.image?.isTemplate = true
         }
 
@@ -85,7 +85,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         menu.addItem(NSMenuItem.separator())
 
         let quitItem = NSMenuItem(
-            title: "Quit Whisper-AI",
+            title: "Quit Hola-AI",
             action: #selector(quitApp),
             keyEquivalent: "q"
         )
@@ -232,7 +232,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             dictationMenuItem?.title = "Start Dictation"
             statusItem?.button?.image = NSImage(
                 systemSymbolName: "waveform.circle.fill",
-                accessibilityDescription: "Whisper-AI"
+                accessibilityDescription: "Hola-AI"
             )
             statusItem?.button?.contentTintColor = nil
             statusItem?.button?.image?.isTemplate = true
@@ -363,7 +363,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                 backing: .buffered,
                 defer: false
             )
-            preferencesWindow?.title = "Whisper-AI Preferences"
+            preferencesWindow?.title = "Hola-AI Preferences"
             preferencesWindow?.contentView = NSHostingView(rootView: preferencesView)
             preferencesWindow?.center()
             preferencesWindow?.isReleasedWhenClosed = false

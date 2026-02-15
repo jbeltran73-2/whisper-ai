@@ -1,4 +1,4 @@
-# Whisper-AI
+# Hola-AI
 
 ## Screenshots
 
@@ -15,7 +15,7 @@
   </tr>
 </table>
 
-Whisper-AI is a macOS dictation app that records your voice, transcribes it with OpenRouter models, cleans the output, and pastes text into the active app.
+Hola-AI is a macOS dictation app that records your voice, transcribes it with OpenRouter models, cleans the output, and pastes text into the active app.
 
 ## Features
 
@@ -30,9 +30,9 @@ Whisper-AI is a macOS dictation app that records your voice, transcribes it with
 
 ## Install (Prebuilt App in This Repo)
 
-1. Download the latest DMG from [GitHub Releases](https://github.com/jbeltran73-2/whisper-ai/releases/latest).
-2. Open it and drag `Whisper-AI.app` to `Applications`.
-3. Open `Whisper-AI` (first launch may require right-click -> Open).
+1. Download the latest DMG from [GitHub Releases](https://github.com/jbeltran73-2/hola-ai/releases/latest).
+2. Open it and drag `Hola-AI.app` to `Applications`.
+3. Open `Hola-AI` (first launch may require right-click -> Open).
 4. Grant permissions: Microphone and Accessibility.
 5. Open Preferences and set your OpenRouter API key, STT model, and prompt enhancement model.
 
@@ -72,8 +72,8 @@ bash scripts/build-dmg.sh
 
 Output:
 
-- `dist/Whisper-AI.app`
-- `dist/Whisper-AI-1.0.0.dmg`
+- `dist/Hola-AI.app`
+- `dist/Hola-AI-1.0.0.dmg`
 
 ## Privacy
 

@@ -30,7 +30,7 @@ enum DictationMode {
 final class VoiceCommandService {
     static let shared = VoiceCommandService()
 
-    private let logger = Logger(subsystem: "com.whisperai.app", category: "VoiceCommand")
+    private let logger = Logger(subsystem: "com.holaai.app", category: "VoiceCommand")
 
     /// Current mode
     private(set) var mode: DictationMode = .dictation

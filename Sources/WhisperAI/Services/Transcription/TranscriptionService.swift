@@ -44,7 +44,7 @@ struct OpenAIErrorResponse: Decodable {
 /// Service responsible for transcribing audio using an OpenAI-compatible API
 @MainActor
 final class TranscriptionService {
-    private let logger = Logger(subsystem: "com.whisperai.app", category: "Transcription")
+    private let logger = Logger(subsystem: "com.holaai.app", category: "Transcription")
     private let whisperEndpoint = "https://openrouter.ai/api/v1/chat/completions"
 
     /// Whether code-switching mode is enabled (use auto-detect for better mixed-language support)
@@ -126,7 +126,7 @@ final class TranscriptionService {
         var request = URLRequest(url: URL(string: whisperEndpoint)!)
         request.httpMethod = "POST"
         request.setValue("Bearer \(apiKey)", forHTTPHeaderField: "Authorization")
-        request.setValue("Whisper-AI", forHTTPHeaderField: "X-Title")
+        request.setValue("Hola-AI", forHTTPHeaderField: "X-Title")
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
         request.httpBody = try JSONSerialization.data(withJSONObject: requestBody)
 

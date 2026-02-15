@@ -8,7 +8,7 @@ struct ContentView: View {
                 .frame(width: 80, height: 80)
                 .foregroundStyle(.blue)
 
-            Text("Whisper-AI")
+            Text("Hola-AI")
                 .font(.largeTitle)
                 .fontWeight(.bold)
 
