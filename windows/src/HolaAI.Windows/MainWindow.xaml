@@ -13,7 +13,8 @@
         AllowsTransparency="True"
         Background="Transparent"
         Topmost="True"
-        ShowInTaskbar="False">
+        ShowInTaskbar="False"
+        ShowActivated="False">
     <Window.Resources>
         <Style x:Key="CircleButtonStyle" TargetType="Button">
             <Setter Property="Width" Value="42" />
@@ -93,6 +94,16 @@
                 </Setter.Value>
             </Setter>
         </Style>
+
+        <Style x:Key="RecordButtonStyle" TargetType="Button" BasedOn="{StaticResource CircleButtonStyle}">
+            <Style.Triggers>
+                <DataTrigger Binding="{Binding IsRecording}" Value="True">
+                    <Setter Property="Background" Value="#FFE5484D" />
+                    <Setter Property="BorderBrush" Value="#FFE5484D" />
+                    <Setter Property="Foreground" Value="White" />
+                </DataTrigger>
+            </Style.Triggers>
+        </Style>
     </Window.Resources>
 
     <Grid MouseLeftButtonDown="Root_OnMouseLeftButtonDown">
@@ -117,7 +128,7 @@
                 <StackPanel Orientation="Horizontal"
                             HorizontalAlignment="Left"
                             VerticalAlignment="Center">
-                    <Button Style="{StaticResource CircleButtonStyle}"
+                    <Button Style="{StaticResource RecordButtonStyle}"
                             Click="RecordButton_OnClick"
                             ToolTip="Start/Stop dictation">
                         <TextBlock FontFamily="Segoe MDL2 Assets"
