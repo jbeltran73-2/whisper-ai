@@ -1,0 +1,70 @@
+<Window x:Class="HolaAI.Windows.MainWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+        xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+        xmlns:primitives="clr-namespace:System.Windows.Controls.Primitives;assembly=PresentationFramework"
+        mc:Ignorable="d"
+        Title="Hola-AI Overlay"
+        Width="330"
+        Height="120"
+        WindowStyle="None"
+        ResizeMode="NoResize"
+        AllowsTransparency="True"
+        Background="Transparent"
+        Topmost="True"
+        ShowInTaskbar="False">
+    <Grid MouseLeftButtonDown="Root_OnMouseLeftButtonDown">
+        <Border CornerRadius="22"
+                Background="#11000000"
+                BorderBrush="#20FFFFFF"
+                BorderThickness="1"
+                Padding="14,10">
+            <DockPanel LastChildFill="False">
+                <Button DockPanel.Dock="Top"
+                        Width="24"
+                        Height="24"
+                        HorizontalAlignment="Right"
+                        Margin="0,0,0,8"
+                        Click="CloseButton_OnClick"
+                        Background="#BB1E1E1E"
+                        Foreground="White"
+                        BorderThickness="0"
+                        FontWeight="Bold"
+                        Content="×"/>
+
+                <StackPanel Orientation="Horizontal"
+                            HorizontalAlignment="Left"
+                            VerticalAlignment="Center">
+                    <Button Width="40"
+                            Height="40"
+                            Margin="0,0,8,0"
+                            Click="RecordButton_OnClick"
+                            Content="🎤"
+                            ToolTip="Start/Stop dictation"/>
+
+                    <primitives:ToggleButton Width="40"
+                                             Height="40"
+                                             Margin="0,0,8,0"
+                                             IsChecked="{Binding IsPromptMode}"
+                                             ToolTip="Enhanced prompt mode"
+                                             Content="✦"/>
+
+                    <primitives:ToggleButton Width="40"
+                                             Height="40"
+                                             Margin="0,0,8,0"
+                                             IsChecked="{Binding TranslateToEnglish}"
+                                             ToolTip="Translate to English"
+                                             Content="🇺🇸/🇬🇧"/>
+
+                    <Button Width="40"
+                            Height="40"
+                            IsEnabled="{Binding CanCopyLastText}"
+                            Click="CopyButton_OnClick"
+                            Content="⧉"
+                            ToolTip="Copy last text"/>
+                </StackPanel>
+            </DockPanel>
+        </Border>
+    </Grid>
+</Window>

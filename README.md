@@ -17,6 +17,10 @@
 
 Hola-AI is a macOS dictation app that records your voice, transcribes it with OpenRouter models, cleans the output, and pastes text into the active app.
 
+## Windows
+
+A Windows project scaffold is available in `windows/`.
+
 ## Features
 
 - Floating overlay with one-click microphone control
