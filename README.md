@@ -4,14 +4,14 @@
 
 <table>
   <tr>
-    <td colspan="2" align="center"><img src="images/overlay-recording.png" alt="Overlay Recording" width="620"></td>
+    <td colspan="2" align="center"><img src="images/overlay-recording.png" alt="Overlay Recording" width="420"></td>
   </tr>
   <tr>
-    <td><img src="images/preferences-general.png" alt="Preferences General" width="420"></td>
-    <td><img src="images/preferences-api.png" alt="Preferences API" width="420"></td>
+    <td><img src="images/preferences-general.png" alt="Preferences General" width="320"></td>
+    <td><img src="images/preferences-api.png" alt="Preferences API" width="320"></td>
   </tr>
   <tr>
-    <td colspan="2" align="center"><img src="images/permissions.png" alt="Permissions" width="620"></td>
+    <td colspan="2" align="center"><img src="images/permissions.png" alt="Permissions" width="420"></td>
   </tr>
 </table>
 
