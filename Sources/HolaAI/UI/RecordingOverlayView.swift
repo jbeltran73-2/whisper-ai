@@ -14,7 +14,7 @@ struct RecordingOverlayView: View {
     var onClose: (() -> Void)?
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 2) {
+        VStack(alignment: .leading, spacing: 6) {
             HStack {
                 Spacer()
                 closeButton
@@ -71,8 +71,21 @@ struct RecordingOverlayView: View {
                 .disabled(!canCopyLastText)
                 .help("Copy last spoken text")
             }
+            .padding(.horizontal, 12)
+            .padding(.vertical, 10)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .background(controlClusterBackground)
         }
         .padding(8)
+    }
+
+    private var controlClusterBackground: some View {
+        RoundedRectangle(cornerRadius: 18, style: .continuous)
+            .fill(Color.black.opacity(0.22))
+            .overlay(
+                RoundedRectangle(cornerRadius: 18, style: .continuous)
+                    .stroke(Color.white.opacity(0.18), lineWidth: 1)
+            )
     }
 
     private var closeButton: some View {
