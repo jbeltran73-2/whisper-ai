@@ -2,6 +2,7 @@ using System.Net.Http.Headers;
 using System.Text;
 using System.Text.Json;
 using System.Net.Http;
+using System.IO;
 
 namespace HolaAI.Windows.Services;
 
