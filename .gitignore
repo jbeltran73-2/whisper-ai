@@ -1,0 +1,9 @@
+.DS_Store
+.build/
+dist/
+
+# Local/private docs and tooling state
+prompt.md
+.claude/
+.ralph/
+.last-branch
