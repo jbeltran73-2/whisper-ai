@@ -64,7 +64,7 @@ struct RecordingOverlayView: View {
                         .frame(width: 32, height: 32)
                         .background(
                             Circle()
-                                .fill(canCopyLastText ? Color.green : Color.gray.opacity(0.2))
+                                .fill(canCopyLastText ? Color.green : Color.white.opacity(0.98))
                         )
                 }
                 .buttonStyle(.plain)
@@ -81,10 +81,10 @@ struct RecordingOverlayView: View {
 
     private var controlClusterBackground: some View {
         RoundedRectangle(cornerRadius: 18, style: .continuous)
-            .fill(Color.black.opacity(0.22))
+            .fill(Color.black.opacity(0.07))
             .overlay(
                 RoundedRectangle(cornerRadius: 18, style: .continuous)
-                    .stroke(Color.white.opacity(0.18), lineWidth: 1)
+                    .stroke(Color.white.opacity(0.06), lineWidth: 1)
             )
     }
 
@@ -133,7 +133,7 @@ private struct IconToggle: View {
                 .frame(width: 32, height: 32)
                 .background(
                     Circle()
-                        .fill(isOn ? onColor : Color.gray.opacity(0.2))
+                        .fill(isOn ? onColor : Color.white.opacity(0.98))
                 )
         }
         .buttonStyle(.plain)
@@ -149,7 +149,7 @@ private struct FlagToggle: View {
         Button(action: { isOn.toggle() }) {
             ZStack {
                 Circle()
-                    .fill(isOn ? Color.clear : Color.gray.opacity(0.2))
+                    .fill(isOn ? Color.clear : Color.white.opacity(0.98))
 
                 GeometryReader { proxy in
                     let width = proxy.size.width
@@ -164,7 +164,7 @@ private struct FlagToggle: View {
                 .clipShape(Circle())
 
                 Circle()
-                    .stroke(isOn ? onColor : Color.gray.opacity(0.35), lineWidth: 1.5)
+                    .stroke(isOn ? onColor : Color.white.opacity(1.0), lineWidth: 1.5)
             }
             .frame(width: 36, height: 32)
         }

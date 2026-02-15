@@ -73,7 +73,7 @@ bash scripts/build-dmg.sh
 Output:
 
 - `dist/Hola-AI.app`
-- `dist/Hola-AI-1.0.0.dmg`
+- `dist/Hola-AI-1.0.1.dmg`
 
 ## Privacy
 
