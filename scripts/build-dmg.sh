@@ -4,7 +4,7 @@ set -e
 # Configuration
 APP_NAME="Hola-AI"
 BUNDLE_ID="com.holaai.app"
-VERSION="1.0.1"
+VERSION="1.0.2"
 
 # Directories
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"

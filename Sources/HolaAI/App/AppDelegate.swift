@@ -1,4 +1,5 @@
 import AppKit
+import AVFoundation
 import SwiftUI
 
 @MainActor
@@ -28,6 +29,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
         // Check and request Accessibility permission on launch
         checkAccessibilityPermission()
+        checkMicrophonePermission()
 
         // Show the floating overlay button on launch
         recordingOverlay.show()
@@ -43,6 +45,24 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             print("✅ [AppDelegate] Accessibility permission granted")
         } else {
             print("⚠️ [AppDelegate] Accessibility permission needed - prompting user...")
+        }
+    }
+
+    private func checkMicrophonePermission() {
+        switch AVCaptureDevice.authorizationStatus(for: .audio) {
+        case .authorized:
+            print("✅ [AppDelegate] Microphone permission granted")
+        case .notDetermined:
+            Task {
+                let granted = await AVCaptureDevice.requestAccess(for: .audio)
+                print(granted
+                      ? "✅ [AppDelegate] Microphone permission granted after prompt"
+                      : "⚠️ [AppDelegate] Microphone permission denied by user")
+            }
+        case .denied, .restricted:
+            print("⚠️ [AppDelegate] Microphone permission denied/restricted")
+        @unknown default:
+            print("⚠️ [AppDelegate] Unknown microphone permission state")
         }
     }
 

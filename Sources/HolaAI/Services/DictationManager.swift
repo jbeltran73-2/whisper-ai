@@ -1,3 +1,5 @@
+import AppKit
+import AVFoundation
 import Foundation
 import os.log
 
@@ -252,7 +254,15 @@ final class DictationManager: AudioCaptureDelegate {
 
     /// Request microphone permission
     func requestMicrophonePermission() async -> Bool {
-        await audioCapture.requestPermission()
+        let granted = await audioCapture.requestPermission()
+        if !granted {
+            let status = audioCapture.permissionStatus
+            if status == .denied || status == .restricted,
+               let url = URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_Microphone") {
+                NSWorkspace.shared.open(url)
+            }
+        }
+        return granted
     }
 
     /// Request accessibility permission (opens System Settings)
