@@ -13,9 +13,9 @@ Whisper-AI is a macOS dictation app that records your voice, transcribes it with
 - Copy last spoken text button
 - Global shortcuts: `Cmd+Shift+D` start/stop dictation, `Cmd+Shift+C` command mode toggle
 
-## Install (Free for Non-Commercial Use)
+## Install (Prebuilt App in This Repo)
 
-1. Download the latest `.dmg`.
+1. Download `releases/Whisper-AI-1.0.0.dmg` from this repository.
 2. Open it and drag `Whisper-AI.app` to `Applications`.
 3. Open `Whisper-AI` (first launch may require right-click -> Open).
 4. Grant permissions: Microphone and Accessibility.
@@ -65,15 +65,8 @@ Output:
 - Your API key is stored locally in your Keychain.
 - This repository does not include your API key.
 - Audio/text are processed via your configured OpenRouter models.
+- Prebuilt binaries in this repo do not embed your personal API key.
 
 ## License
 
-This project is **source-available** under the PolyForm Noncommercial terms.
-
-- Non-commercial use is allowed.
-- Commercial use requires a separate paid commercial license.
-
-See:
-
-- `LICENSE`
-- `COMMERCIAL_LICENSE.md`
+This project is licensed under the MIT License. See `LICENSE`.
