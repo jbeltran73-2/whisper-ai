@@ -1,0 +1,63 @@
+name: Windows Build
+
+on:
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - "windows/**"
+      - ".github/workflows/windows-build.yml"
+  push:
+    tags:
+      - "v*"
+
+jobs:
+  build-windows:
+    runs-on: windows-latest
+    permissions:
+      contents: write
+
+    env:
+      PROJECT_PATH: windows/src/HolaAI.Windows/HolaAI.Windows.csproj
+      PUBLISH_DIR: windows/src/HolaAI.Windows/bin/Release/publish/win-x64
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: "8.0.x"
+
+      - name: Restore
+        run: dotnet restore $env:PROJECT_PATH
+
+      - name: Publish Windows EXE
+        run: >
+          dotnet publish $env:PROJECT_PATH
+          -c Release
+          -r win-x64
+          --self-contained true
+          /p:PublishSingleFile=true
+          /p:IncludeNativeLibrariesForSelfExtract=true
+          -o $env:PUBLISH_DIR
+
+      - name: Prepare ZIP
+        shell: pwsh
+        run: |
+          $version = if ("${{ github.ref_type }}" -eq "tag") { "${{ github.ref_name }}" } else { "dev-${{ github.sha }}" }
+          $zipName = "Hola-AI-Windows-x64-$version.zip"
+          Compress-Archive -Path "$env:PUBLISH_DIR\*" -DestinationPath "$env:RUNNER_TEMP\$zipName" -Force
+          "ZIP_PATH=$env:RUNNER_TEMP\$zipName" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+
+      - name: Upload workflow artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: hola-ai-windows-x64
+          path: ${{ env.ZIP_PATH }}
+
+      - name: Upload to GitHub Release (tag only)
+        if: github.ref_type == 'tag'
+        uses: softprops/action-gh-release@v2
+        with:
+          files: ${{ env.ZIP_PATH }}
