@@ -94,9 +94,10 @@ final class DictationManager: AudioCaptureDelegate {
             return
         }
 
-        // Check for API key first
-        guard KeychainService.shared.hasAPIKey else {
-            print("❌ [DictationManager] No API key configured!")
+        // Check for API key for the configured STT provider
+        let sttProvider = transcriptionService.currentSTTProvider
+        guard KeychainService.shared.hasKey(for: sttProvider.keychainAccount) else {
+            print("❌ [DictationManager] No API key configured for \(sttProvider.rawValue)!")
             onError?(TranscriptionError.noAPIKey)
             return
         }

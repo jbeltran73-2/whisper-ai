@@ -1,0 +1,89 @@
+name: macOS Build
+
+on:
+  workflow_dispatch:
+  push:
+    tags:
+      - "v*"
+
+jobs:
+  build-macos:
+    runs-on: macos-14
+    permissions:
+      contents: write
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Xcode
+        uses: maxim-lobanov/setup-xcode@v1
+        with:
+          xcode-version: latest-stable
+
+      - name: Extract version
+        id: version
+        run: |
+          if [[ "${{ github.ref_type }}" == "tag" ]]; then
+            VERSION="${{ github.ref_name }}"
+            VERSION="${VERSION#v}"
+          else
+            VERSION="dev-$(echo ${{ github.sha }} | cut -c1-7)"
+          fi
+          echo "version=${VERSION}" >> $GITHUB_OUTPUT
+
+      - name: Build release binary
+        run: |
+          xcodebuild -scheme HolaAI \
+            -destination 'platform=macOS' \
+            -configuration Release \
+            -derivedDataPath build \
+            build
+
+      - name: Create app bundle
+        run: |
+          VERSION="${{ steps.version.outputs.version }}"
+          APP_DIR="dist/Hola-AI.app"
+          mkdir -p "${APP_DIR}/Contents/MacOS"
+          mkdir -p "${APP_DIR}/Contents/Resources"
+
+          cp build/Build/Products/Release/HolaAI "${APP_DIR}/Contents/MacOS/HolaAI"
+          cp Info.plist "${APP_DIR}/Contents/Info.plist"
+
+          /usr/libexec/PlistBuddy -c "Set :CFBundleVersion ${VERSION}" "${APP_DIR}/Contents/Info.plist"
+          /usr/libexec/PlistBuddy -c "Set :CFBundleShortVersionString ${VERSION}" "${APP_DIR}/Contents/Info.plist"
+
+          if [ -f Sources/HolaAI/Resources/AppIcon.icns ]; then
+            cp Sources/HolaAI/Resources/AppIcon.icns "${APP_DIR}/Contents/Resources/AppIcon.icns"
+          fi
+
+          RESOURCE_BUNDLE=$(find build/Build/Products -name "HolaAI_HolaAI.bundle" -type d 2>/dev/null | head -1)
+          if [ -n "${RESOURCE_BUNDLE}" ] && [ -d "${RESOURCE_BUNDLE}" ]; then
+            cp -R "${RESOURCE_BUNDLE}" "${APP_DIR}/Contents/Resources/"
+          fi
+
+      - name: Create DMG
+        run: |
+          VERSION="${{ steps.version.outputs.version }}"
+          DMG_NAME="Hola-AI-macOS-${VERSION}.dmg"
+          mkdir -p dist/dmg
+          cp -R dist/Hola-AI.app dist/dmg/
+          ln -s /Applications dist/dmg/Applications
+          hdiutil create -volname "Hola-AI" \
+            -srcfolder dist/dmg \
+            -ov -format UDZO \
+            "dist/${DMG_NAME}"
+          echo "DMG_PATH=dist/${DMG_NAME}" >> $GITHUB_ENV
+          echo "DMG_NAME=${DMG_NAME}" >> $GITHUB_ENV
+
+      - name: Upload workflow artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: hola-ai-macos
+          path: ${{ env.DMG_PATH }}
+
+      - name: Upload to GitHub Release (tag only)
+        if: github.ref_type == 'tag'
+        uses: softprops/action-gh-release@v2
+        with:
+          files: ${{ env.DMG_PATH }}

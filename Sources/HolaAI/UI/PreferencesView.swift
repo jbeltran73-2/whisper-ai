@@ -1,15 +1,29 @@
 import SwiftUI
 
 struct PreferencesView: View {
-    @State private var apiKey: String = ""
     @State private var selectedLanguage: String = "auto"
     @State private var shortcutText: String = "Cmd+Shift+D"
-    @State private var showAPIKey: Bool = false
-    @State private var apiKeySaved: Bool = false
     @State private var enableCodeSwitching: Bool = false
     @State private var showDockIcon: Bool = true
+
+    // Provider selections
+    @State private var sttProvider: STTProvider = .groq
+    @State private var dictationLLMProvider: LLMProvider = .cerebras
+    @State private var promptLLMProvider: LLMProvider = .openrouter
+
+    // Models
     @State private var sttModel: String = ""
+    @State private var dictationLLMModel: String = ""
     @State private var promptModel: String = ""
+
+    // API Keys
+    @State private var groqKey: String = ""
+    @State private var cerebrasKey: String = ""
+    @State private var openrouterKey: String = ""
+    @State private var showGroqKey: Bool = false
+    @State private var showCerebrasKey: Bool = false
+    @State private var showOpenRouterKey: Bool = false
+    @State private var savedKey: String? = nil // which key was just saved
 
     private let languages: [(code: String, name: String)] = [
         ("auto", "Auto-detect"),
@@ -49,7 +63,7 @@ struct PreferencesView: View {
                     Label("API", systemImage: "key")
                 }
         }
-        .frame(width: 480, height: 380)
+        .frame(width: 520, height: 560)
         .onAppear {
             loadSettings()
         }
@@ -66,7 +80,7 @@ struct PreferencesView: View {
                 .onChange(of: selectedLanguage) { newValue in
                     saveLanguage(newValue)
                 }
-                .disabled(enableCodeSwitching) // Disable when code-switching is on
+                .disabled(enableCodeSwitching)
 
                 Toggle("Code-Switching Mode", isOn: $enableCodeSwitching)
                     .onChange(of: enableCodeSwitching) { newValue in
@@ -139,78 +153,107 @@ struct PreferencesView: View {
 
     private var apiTab: some View {
         Form {
+            // STT Provider
             Section {
-                HStack {
-                    if showAPIKey {
-                        TextField("sk-...", text: $apiKey)
-                            .textFieldStyle(.roundedBorder)
-                    } else {
-                        SecureField("sk-...", text: $apiKey)
-                            .textFieldStyle(.roundedBorder)
-                    }
-
-                    Button {
-                        showAPIKey.toggle()
-                    } label: {
-                        Image(systemName: showAPIKey ? "eye.slash" : "eye")
-                    }
-                    .buttonStyle(.borderless)
-                }
-
-                HStack {
-                    Button("Save API Key") {
-                        saveAPIKey()
-                    }
-                    .disabled(apiKey.isEmpty)
-
-                    if apiKeySaved {
-                        Label("Saved", systemImage: "checkmark.circle.fill")
-                            .foregroundStyle(.green)
-                            .transition(.opacity)
-                    }
-
-                    Spacer()
-
-                    if KeychainService.shared.hasAPIKey {
-                        Button("Clear", role: .destructive) {
-                            clearAPIKey()
-                        }
+                Picker("Provider", selection: $sttProvider) {
+                    ForEach(STTProvider.allCases) { p in
+                        Text(p.rawValue).tag(p)
                     }
                 }
-            } header: {
-                Text("OpenRouter API Key")
-            } footer: {
-                Text("Your API key is stored securely in the macOS Keychain.")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-            }
+                .onChange(of: sttProvider) { newValue in
+                    UserDefaults.standard.set(newValue.rawValue, forKey: "sttProvider")
+                    if sttModel.isEmpty || STTProvider.allCases.contains(where: { $0.defaultModel == sttModel && $0 != newValue }) {
+                        sttModel = newValue.defaultModel
+                        UserDefaults.standard.set(sttModel, forKey: "sttModel")
+                    }
+                }
 
-            Section {
-                TextField("STT model (e.g., openai/whisper-1)", text: $sttModel)
+                TextField("Model", text: $sttModel)
                     .textFieldStyle(.roundedBorder)
                     .onChange(of: sttModel) { newValue in
-                        saveSTTModel(newValue)
-                    }
-
-                TextField("Prompt enhancement model (e.g., openai/gpt-4o-mini)", text: $promptModel)
-                    .textFieldStyle(.roundedBorder)
-                    .onChange(of: promptModel) { newValue in
-                        savePromptModel(newValue)
+                        UserDefaults.standard.set(newValue.trimmingCharacters(in: .whitespacesAndNewlines), forKey: "sttModel")
                     }
             } header: {
-                Text("Models")
+                Text("Transcription (STT)")
             } footer: {
-                Text("STT model must support audio inputs on OpenRouter. The prompt model is used for prompt enhancement and translations.")
+                Text("Groq uses native Whisper API (fastest). OpenRouter uses audio via chat completions.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+
+            // Dictation LLM
+            Section {
+                Picker("Provider", selection: $dictationLLMProvider) {
+                    ForEach(LLMProvider.allCases) { p in
+                        Text(p.rawValue).tag(p)
+                    }
+                }
+                .onChange(of: dictationLLMProvider) { newValue in
+                    UserDefaults.standard.set(newValue.rawValue, forKey: "dictationLLMProvider")
+                    if dictationLLMModel.isEmpty || LLMProvider.allCases.contains(where: { $0.defaultModel == dictationLLMModel && $0 != newValue }) {
+                        dictationLLMModel = newValue.defaultModel
+                        UserDefaults.standard.set(dictationLLMModel, forKey: "dictationLLMModel")
+                    }
+                }
+
+                TextField("Model", text: $dictationLLMModel)
+                    .textFieldStyle(.roundedBorder)
+                    .onChange(of: dictationLLMModel) { newValue in
+                        UserDefaults.standard.set(newValue.trimmingCharacters(in: .whitespacesAndNewlines), forKey: "dictationLLMModel")
+                    }
+            } header: {
+                Text("Text Cleanup (Dictation)")
+            } footer: {
+                Text("Fast model for punctuation, capitalization, and self-correction cleanup.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+
+            // Prompt LLM
+            Section {
+                Picker("Provider", selection: $promptLLMProvider) {
+                    ForEach(LLMProvider.allCases) { p in
+                        Text(p.rawValue).tag(p)
+                    }
+                }
+                .onChange(of: promptLLMProvider) { newValue in
+                    UserDefaults.standard.set(newValue.rawValue, forKey: "promptLLMProvider")
+                    if promptModel.isEmpty || LLMProvider.allCases.contains(where: { $0.defaultModel == promptModel && $0 != newValue }) {
+                        promptModel = newValue.defaultModel
+                        UserDefaults.standard.set(promptModel, forKey: "promptEnhancementModel")
+                    }
+                }
+
+                TextField("Model", text: $promptModel)
+                    .textFieldStyle(.roundedBorder)
+                    .onChange(of: promptModel) { newValue in
+                        UserDefaults.standard.set(newValue.trimmingCharacters(in: .whitespacesAndNewlines), forKey: "promptEnhancementModel")
+                    }
+            } header: {
+                Text("Prompt Enhancement")
+            } footer: {
+                Text("More capable model for translating and rewriting prompts to English.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+
+            // API Keys
+            Section {
+                apiKeyRow(label: "Groq", key: $groqKey, show: $showGroqKey, account: "groq-api-key")
+                apiKeyRow(label: "Cerebras", key: $cerebrasKey, show: $showCerebrasKey, account: "cerebras-api-key")
+                apiKeyRow(label: "OpenRouter", key: $openrouterKey, show: $showOpenRouterKey, account: "openrouter-api-key")
+            } header: {
+                Text("API Keys")
+            } footer: {
+                Text("Keys are stored securely in the macOS Keychain. Only keys for providers you use are required.")
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }
 
             Section {
-                Link("Get an API key from OpenRouter",
-                     destination: URL(string: "https://openrouter.ai/keys")!)
-
-                Link("Browse OpenRouter models",
-                     destination: URL(string: "https://openrouter.ai/models")!)
+                Link("Get Groq API key", destination: URL(string: "https://console.groq.com/keys")!)
+                Link("Get Cerebras API key", destination: URL(string: "https://cloud.cerebras.ai/")!)
+                Link("Get OpenRouter API key", destination: URL(string: "https://openrouter.ai/keys")!)
             } header: {
                 Text("Help")
             }
@@ -219,54 +262,111 @@ struct PreferencesView: View {
         .padding()
     }
 
+    @ViewBuilder
+    private func apiKeyRow(label: String, key: Binding<String>, show: Binding<Bool>, account: String) -> some View {
+        VStack(alignment: .leading, spacing: 4) {
+            HStack {
+                Text(label)
+                    .frame(width: 80, alignment: .leading)
+
+                if show.wrappedValue {
+                    TextField("API key...", text: key)
+                        .textFieldStyle(.roundedBorder)
+                } else {
+                    SecureField("API key...", text: key)
+                        .textFieldStyle(.roundedBorder)
+                }
+
+                Button {
+                    show.wrappedValue.toggle()
+                } label: {
+                    Image(systemName: show.wrappedValue ? "eye.slash" : "eye")
+                }
+                .buttonStyle(.borderless)
+
+                Button("Save") {
+                    saveProviderKey(key.wrappedValue, account: account)
+                }
+                .disabled(key.wrappedValue.isEmpty || key.wrappedValue == "********")
+
+                if savedKey == account {
+                    Image(systemName: "checkmark.circle.fill")
+                        .foregroundStyle(.green)
+                        .transition(.opacity)
+                }
+
+                if KeychainService.shared.hasKey(for: account) {
+                    Button(role: .destructive) {
+                        KeychainService.shared.deleteKey(for: account)
+                        key.wrappedValue = ""
+                    } label: {
+                        Image(systemName: "trash")
+                    }
+                    .buttonStyle(.borderless)
+                }
+            }
+        }
+    }
+
+    // MARK: - Load / Save
+
     private func loadSettings() {
-        // Load API key (show placeholder if exists)
-        if KeychainService.shared.hasAPIKey {
-            apiKey = "********"  // Don't show actual key
+        // Language
+        if let saved = UserDefaults.standard.string(forKey: "transcriptionLanguage") {
+            selectedLanguage = saved
         }
-
-        // Load language preference
-        if let savedLanguage = UserDefaults.standard.string(forKey: "transcriptionLanguage") {
-            selectedLanguage = savedLanguage
-        }
-
-        // Load code-switching preference
         enableCodeSwitching = UserDefaults.standard.bool(forKey: "enableCodeSwitching")
 
-        // Load model preferences
-        sttModel = UserDefaults.standard.string(forKey: "sttModel") ?? ""
-        promptModel = UserDefaults.standard.string(forKey: "promptEnhancementModel") ?? ""
-
-        if let savedDockPreference = UserDefaults.standard.object(forKey: "showDockIcon") as? Bool {
-            showDockIcon = savedDockPreference
+        // Dock
+        if let savedDock = UserDefaults.standard.object(forKey: "showDockIcon") as? Bool {
+            showDockIcon = savedDock
         } else {
             showDockIcon = true
             UserDefaults.standard.set(true, forKey: "showDockIcon")
         }
+
+        // Providers
+        if let raw = UserDefaults.standard.string(forKey: "sttProvider"), let p = STTProvider(rawValue: raw) {
+            sttProvider = p
+        }
+        if let raw = UserDefaults.standard.string(forKey: "dictationLLMProvider"), let p = LLMProvider(rawValue: raw) {
+            dictationLLMProvider = p
+        }
+        if let raw = UserDefaults.standard.string(forKey: "promptLLMProvider"), let p = LLMProvider(rawValue: raw) {
+            promptLLMProvider = p
+        }
+
+        // Models (use defaults if empty)
+        sttModel = UserDefaults.standard.string(forKey: "sttModel") ?? sttProvider.defaultModel
+        dictationLLMModel = UserDefaults.standard.string(forKey: "dictationLLMModel") ?? dictationLLMProvider.defaultModel
+        promptModel = UserDefaults.standard.string(forKey: "promptEnhancementModel") ?? promptLLMProvider.defaultModel
+
+        // API Keys - show placeholder if stored
+        if KeychainService.shared.hasKey(for: "groq-api-key") { groqKey = "********" }
+        if KeychainService.shared.hasKey(for: "cerebras-api-key") { cerebrasKey = "********" }
+        if KeychainService.shared.hasKey(for: "openrouter-api-key") { openrouterKey = "********" }
     }
 
-    private func saveAPIKey() {
-        // Don't save if it's the placeholder
-        guard apiKey != "********" && !apiKey.isEmpty else { return }
+    private func saveProviderKey(_ key: String, account: String) {
+        guard key != "********" && !key.isEmpty else { return }
 
-        if KeychainService.shared.saveAPIKey(apiKey) {
+        if KeychainService.shared.saveKey(key, for: account) {
             withAnimation {
-                apiKeySaved = true
+                savedKey = account
             }
-            // Reset after 2 seconds
             DispatchQueue.main.asyncAfter(deadline: .now() + 2) {
                 withAnimation {
-                    apiKeySaved = false
+                    if savedKey == account { savedKey = nil }
                 }
             }
             // Replace with placeholder
-            apiKey = "********"
+            switch account {
+            case "groq-api-key": groqKey = "********"
+            case "cerebras-api-key": cerebrasKey = "********"
+            case "openrouter-api-key": openrouterKey = "********"
+            default: break
+            }
         }
-    }
-
-    private func clearAPIKey() {
-        KeychainService.shared.deleteAPIKey()
-        apiKey = ""
     }
 
     private func saveLanguage(_ language: String) {
@@ -276,14 +376,6 @@ struct PreferencesView: View {
 
     private func saveCodeSwitching(_ enabled: Bool) {
         UserDefaults.standard.set(enabled, forKey: "enableCodeSwitching")
-    }
-
-    private func saveSTTModel(_ model: String) {
-        UserDefaults.standard.set(model.trimmingCharacters(in: .whitespacesAndNewlines), forKey: "sttModel")
-    }
-
-    private func savePromptModel(_ model: String) {
-        UserDefaults.standard.set(model.trimmingCharacters(in: .whitespacesAndNewlines), forKey: "promptEnhancementModel")
     }
 
     private func saveShowDockIcon(_ enabled: Bool) {

@@ -1,187 +1,67 @@
 #!/bin/bash
-set -e
+set -euo pipefail
 
-# Configuration
+VERSION="${1:-1.0.0}"
 APP_NAME="Hola-AI"
-BUNDLE_ID="com.holaai.app"
-VERSION="1.0.6"
-SIGN_IDENTITY="${SIGN_IDENTITY:--}"
-NOTARY_PROFILE="${NOTARY_PROFILE:-}"
+BUNDLE_NAME="${APP_NAME}.app"
+BUILD_DIR="/tmp/HolaAI-release"
+APP_DIR="${BUILD_DIR}/${BUNDLE_NAME}"
+DMG_DIR="${BUILD_DIR}/dmg"
+DMG_OUTPUT="${BUILD_DIR}/${APP_NAME}-macOS-${VERSION}.dmg"
+PROJECT_DIR="$(cd "$(dirname "$0")/.." && pwd)"
 
-# Directories
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-PROJECT_DIR="$(dirname "$SCRIPT_DIR")"
-BUILD_DIR="$PROJECT_DIR/.build/release"
-DIST_DIR="$PROJECT_DIR/dist"
-APP_BUNDLE="$DIST_DIR/$APP_NAME.app"
+echo "==> Building ${APP_NAME} v${VERSION}..."
+rm -rf "${BUILD_DIR}"
+mkdir -p "${BUILD_DIR}"
 
-echo "🔨 Building $APP_NAME v$VERSION..."
+echo "==> Compiling release build..."
+xcodebuild -scheme HolaAI \
+    -destination 'platform=macOS' \
+    -configuration Release \
+    -derivedDataPath "${BUILD_DIR}/xcode" \
+    build 2>&1 | tail -5
 
-# Clean previous build
-rm -rf "$DIST_DIR"
-mkdir -p "$DIST_DIR"
+BINARY="${BUILD_DIR}/xcode/Build/Products/Release/HolaAI"
 
-# Build release version
-cd "$PROJECT_DIR"
-swift build -c release
-
-echo "📦 Creating app bundle..."
-
-# Create app bundle structure
-mkdir -p "$APP_BUNDLE/Contents/MacOS"
-mkdir -p "$APP_BUNDLE/Contents/Resources"
-
-# Copy executable
-cp "$BUILD_DIR/HolaAI" "$APP_BUNDLE/Contents/MacOS/$APP_NAME"
-
-# Create Info.plist
-cat > "$APP_BUNDLE/Contents/Info.plist" << EOF
-<?xml version="1.0" encoding="UTF-8"?>
-<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
-<plist version="1.0">
-<dict>
-    <key>CFBundleExecutable</key>
-    <string>$APP_NAME</string>
-    <key>CFBundleIdentifier</key>
-    <string>$BUNDLE_ID</string>
-    <key>CFBundleName</key>
-    <string>$APP_NAME</string>
-    <key>CFBundleDisplayName</key>
-    <string>Hola-AI</string>
-    <key>CFBundleVersion</key>
-    <string>$VERSION</string>
-    <key>CFBundleShortVersionString</key>
-    <string>$VERSION</string>
-    <key>CFBundlePackageType</key>
-    <string>APPL</string>
-    <key>CFBundleSignature</key>
-    <string>????</string>
-    <key>CFBundleIconFile</key>
-    <string>AppIcon</string>
-    <key>LSMinimumSystemVersion</key>
-    <string>13.0</string>
-    <key>LSUIElement</key>
-    <false/>
-    <key>NSHighResolutionCapable</key>
-    <true/>
-    <key>NSMicrophoneUsageDescription</key>
-    <string>Hola-AI needs access to your microphone to transcribe your speech.</string>
-    <key>NSAppleEventsUsageDescription</key>
-    <string>Hola-AI needs accessibility access to insert transcribed text into other applications.</string>
-</dict>
-</plist>
-EOF
-
-# Copy app icon
-if [ -f "$PROJECT_DIR/Sources/HolaAI/Resources/AppIcon.icns" ]; then
-    cp "$PROJECT_DIR/Sources/HolaAI/Resources/AppIcon.icns" "$APP_BUNDLE/Contents/Resources/"
-    echo "📎 Added app icon"
+if [ ! -f "${BINARY}" ]; then
+    echo "Trying Debug..."
+    xcodebuild -scheme HolaAI \
+        -destination 'platform=macOS' \
+        -derivedDataPath "${BUILD_DIR}/xcode" \
+        build 2>&1 | tail -5
+    BINARY="${BUILD_DIR}/xcode/Build/Products/Debug/HolaAI"
 fi
 
-# Create PkgInfo
-echo -n "APPL????" > "$APP_BUNDLE/Contents/PkgInfo"
+[ ! -f "${BINARY}" ] && echo "ERROR: Binary not found" && exit 1
 
-# Create entitlements file for permissions
-cat > "$DIST_DIR/entitlements.plist" << EOF
-<?xml version="1.0" encoding="UTF-8"?>
-<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
-<plist version="1.0">
-<dict>
-    <key>com.apple.security.device.audio-input</key>
-    <true/>
-    <key>com.apple.security.automation.apple-events</key>
-    <true/>
-</dict>
-</plist>
-EOF
+echo "==> Creating app bundle..."
+mkdir -p "${APP_DIR}/Contents/MacOS"
+mkdir -p "${APP_DIR}/Contents/Resources"
 
-# Copy any resources if they exist
-if [ -d "$PROJECT_DIR/Sources/HolaAI/Resources" ]; then
-    cp -r "$PROJECT_DIR/Sources/HolaAI/Resources"/* "$APP_BUNDLE/Contents/Resources/" 2>/dev/null || true
-fi
+cp "${BINARY}" "${APP_DIR}/Contents/MacOS/HolaAI"
+cp "${PROJECT_DIR}/Info.plist" "${APP_DIR}/Contents/Info.plist"
 
-if [ "$SIGN_IDENTITY" = "-" ]; then
-    echo "🔏 Signing app (ad-hoc)..."
-    # Ad-hoc signature for local/testing builds
-    codesign --force --deep --sign - --entitlements "$DIST_DIR/entitlements.plist" "$APP_BUNDLE"
-else
-    echo "🔏 Signing app with Developer ID identity: $SIGN_IDENTITY"
-    # Keep microphone/apple-events entitlements while signing for distribution
-    codesign --force --deep --options runtime --timestamp \
-      --sign "$SIGN_IDENTITY" \
-      --entitlements "$DIST_DIR/entitlements.plist" \
-      "$APP_BUNDLE"
-fi
+/usr/libexec/PlistBuddy -c "Set :CFBundleVersion ${VERSION}" "${APP_DIR}/Contents/Info.plist"
+/usr/libexec/PlistBuddy -c "Set :CFBundleShortVersionString ${VERSION}" "${APP_DIR}/Contents/Info.plist"
 
-# Remove quarantine attribute just in case
-xattr -cr "$APP_BUNDLE"
+[ -f "${PROJECT_DIR}/Sources/HolaAI/Resources/AppIcon.icns" ] && \
+    cp "${PROJECT_DIR}/Sources/HolaAI/Resources/AppIcon.icns" "${APP_DIR}/Contents/Resources/AppIcon.icns"
 
-echo "💿 Creating DMG..."
+RESOURCE_BUNDLE=$(find "${BUILD_DIR}/xcode/Build/Products" -name "HolaAI_HolaAI.bundle" -type d 2>/dev/null | head -1)
+[ -n "${RESOURCE_BUNDLE}" ] && [ -d "${RESOURCE_BUNDLE}" ] && \
+    cp -R "${RESOURCE_BUNDLE}" "${APP_DIR}/Contents/Resources/"
 
-# Create DMG
-DMG_NAME="$APP_NAME-$VERSION"
-DMG_PATH="$DIST_DIR/$DMG_NAME.dmg"
-DMG_TEMP="$DIST_DIR/dmg_temp"
+echo "==> Creating DMG..."
+mkdir -p "${DMG_DIR}"
+cp -R "${APP_DIR}" "${DMG_DIR}/"
+ln -s /Applications "${DMG_DIR}/Applications"
 
-# Create temporary directory for DMG contents
-mkdir -p "$DMG_TEMP"
-cp -r "$APP_BUNDLE" "$DMG_TEMP/"
-
-# Create symbolic link to Applications folder
-ln -s /Applications "$DMG_TEMP/Applications"
-
-# Create README
-cat > "$DMG_TEMP/README.txt" << EOF
-Hola-AI - Voice Dictation App
-================================
-
-Installation:
-1. Drag Hola-AI.app to the Applications folder
-2. Open Hola-AI from Applications
-3. The app will appear in your menu bar (top right)
-4. Click the icon → Preferences to add your OpenRouter API key
-5. Grant microphone and accessibility permissions when prompted
-
-Usage:
-- Press Cmd+Shift+D to start/stop dictation
-- Press Cmd+Shift+C for voice command mode
-- Speak naturally - the app will transcribe and insert text
-
-Get your OpenRouter API key at: https://openrouter.ai/keys
-
-Requirements:
-- macOS 13.0 (Ventura) or later
-- OpenRouter API key with access to your selected STT and prompt models
-
-EOF
-
-# Create DMG using hdiutil
-hdiutil create -volname "$APP_NAME" -srcfolder "$DMG_TEMP" -ov -format UDZO "$DMG_PATH"
-
-# Optional notarization (requires Developer ID signing)
-if [ -n "$NOTARY_PROFILE" ]; then
-    if [ "$SIGN_IDENTITY" = "-" ]; then
-        echo "❌ NOTARY_PROFILE is set but SIGN_IDENTITY is ad-hoc. Use a Developer ID identity."
-        exit 1
-    fi
-    echo "🧾 Submitting DMG for notarization using profile: $NOTARY_PROFILE"
-    xcrun notarytool submit "$DMG_PATH" --keychain-profile "$NOTARY_PROFILE" --wait
-    echo "📌 Stapling notarization ticket..."
-    xcrun stapler staple "$DMG_PATH"
-    xcrun stapler validate "$DMG_PATH"
-fi
-
-# Cleanup
-rm -rf "$DMG_TEMP"
+hdiutil create -volname "${APP_NAME}" \
+    -srcfolder "${DMG_DIR}" \
+    -ov -format UDZO \
+    "${DMG_OUTPUT}"
 
 echo ""
-echo "✅ Build complete!"
-echo ""
-echo "📍 App bundle: $APP_BUNDLE"
-echo "📍 DMG file:   $DMG_PATH"
-echo ""
-echo "📤 Share the DMG with your team. They will need to:"
-echo "   1. Open the DMG and drag the app to Applications"
-echo "   2. Right-click → Open (first time, to bypass Gatekeeper)"
-echo "   3. Add their own OpenRouter API key in Preferences"
-echo "   4. Grant microphone + accessibility permissions"
+echo "==> Done!"
+echo "    App: ${APP_DIR}"
+echo "    DMG: ${DMG_OUTPUT}"

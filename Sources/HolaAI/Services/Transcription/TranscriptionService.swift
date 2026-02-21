@@ -14,7 +14,7 @@ enum TranscriptionError: Error, LocalizedError {
     var errorDescription: String? {
         switch self {
         case .noAPIKey:
-            return "No OpenRouter API key configured. Please add your API key in Preferences."
+            return "No API key configured for the selected STT provider. Please add your API key in Preferences."
         case .missingModel:
             return "No STT model configured. Please select a model in Preferences."
         case .invalidAudioFile:
@@ -26,7 +26,7 @@ enum TranscriptionError: Error, LocalizedError {
         case .rateLimited:
             return "Rate limited. Please wait a moment and try again."
         case .invalidResponse:
-            return "Invalid response from OpenRouter API."
+            return "Invalid response from API."
         }
     }
 }
@@ -41,13 +41,21 @@ struct OpenAIErrorResponse: Decodable {
     let error: ErrorDetail
 }
 
-/// Service responsible for transcribing audio using an OpenAI-compatible API
+/// Service responsible for transcribing audio using configurable STT providers
 @MainActor
 final class TranscriptionService {
     private let logger = Logger(subsystem: "com.holaai.app", category: "Transcription")
-    private let whisperEndpoint = "https://openrouter.ai/api/v1/chat/completions"
 
-    /// Whether code-switching mode is enabled (use auto-detect for better mixed-language support)
+    /// Current STT provider
+    var currentSTTProvider: STTProvider {
+        if let raw = UserDefaults.standard.string(forKey: "sttProvider"),
+           let provider = STTProvider(rawValue: raw) {
+            return provider
+        }
+        return .groq
+    }
+
+    /// Whether code-switching mode is enabled
     var isCodeSwitchingEnabled: Bool {
         UserDefaults.standard.bool(forKey: "enableCodeSwitching")
     }
@@ -60,21 +68,103 @@ final class TranscriptionService {
 
     init() {}
 
-    /// Transcribe audio file using OpenRouter (audio input via chat completions)
-    /// - Parameters:
-    ///   - audioURL: URL to the audio file
-    ///   - language: Optional language code (e.g., "en", "es"). If nil or code-switching enabled, auto-detect.
-    /// - Returns: Transcribed text
+    /// Transcribe audio file using the configured STT provider
     func transcribe(audioURL: URL, language: String? = nil) async throws -> String {
-        // Get API key from keychain
-        guard let apiKey = KeychainService.shared.getAPIKey(), !apiKey.isEmpty else {
+        let provider = currentSTTProvider
+
+        guard let apiKey = KeychainService.shared.getKey(for: provider.keychainAccount), !apiKey.isEmpty else {
             throw TranscriptionError.noAPIKey
         }
-        guard let model = sttModel else {
-            throw TranscriptionError.missingModel
+
+        let model = sttModel ?? provider.defaultModel
+
+        switch provider {
+        case .groq:
+            return try await transcribeWithGroq(audioURL: audioURL, language: language, apiKey: apiKey, model: model)
+        case .openrouter:
+            return try await transcribeWithOpenRouter(audioURL: audioURL, language: language, apiKey: apiKey, model: model)
+        }
+    }
+
+    // MARK: - Groq Whisper (multipart/form-data)
+
+    private func transcribeWithGroq(audioURL: URL, language: String?, apiKey: String, model: String) async throws -> String {
+        let audioData: Data
+        do {
+            audioData = try Data(contentsOf: audioURL)
+        } catch {
+            logger.error("Failed to read audio file: \(error.localizedDescription)")
+            throw TranscriptionError.invalidAudioFile
         }
 
-        // Read audio file
+        let boundary = "Boundary-\(UUID().uuidString)"
+        var body = Data()
+
+        // file field
+        let filename = audioURL.lastPathComponent
+        let mimeType = "audio/wav"
+        body.append("--\(boundary)\r\n".data(using: .utf8)!)
+        body.append("Content-Disposition: form-data; name=\"file\"; filename=\"\(filename)\"\r\n".data(using: .utf8)!)
+        body.append("Content-Type: \(mimeType)\r\n\r\n".data(using: .utf8)!)
+        body.append(audioData)
+        body.append("\r\n".data(using: .utf8)!)
+
+        // model field
+        body.append("--\(boundary)\r\n".data(using: .utf8)!)
+        body.append("Content-Disposition: form-data; name=\"model\"\r\n\r\n".data(using: .utf8)!)
+        body.append("\(model)\r\n".data(using: .utf8)!)
+
+        // language field (if set and not code-switching)
+        if let lang = language, !isCodeSwitchingEnabled {
+            body.append("--\(boundary)\r\n".data(using: .utf8)!)
+            body.append("Content-Disposition: form-data; name=\"language\"\r\n\r\n".data(using: .utf8)!)
+            body.append("\(lang)\r\n".data(using: .utf8)!)
+        }
+
+        // response_format
+        body.append("--\(boundary)\r\n".data(using: .utf8)!)
+        body.append("Content-Disposition: form-data; name=\"response_format\"\r\n\r\n".data(using: .utf8)!)
+        body.append("json\r\n".data(using: .utf8)!)
+
+        body.append("--\(boundary)--\r\n".data(using: .utf8)!)
+
+        var request = URLRequest(url: URL(string: STTProvider.groq.baseURL)!)
+        request.httpMethod = "POST"
+        request.setValue("Bearer \(apiKey)", forHTTPHeaderField: "Authorization")
+        request.setValue("multipart/form-data; boundary=\(boundary)", forHTTPHeaderField: "Content-Type")
+        request.httpBody = body
+
+        let (data, response): (Data, URLResponse)
+        do {
+            (data, response) = try await URLSession.shared.data(for: request)
+        } catch {
+            logger.error("Network error: \(error.localizedDescription)")
+            throw TranscriptionError.networkError(underlying: error)
+        }
+
+        guard let httpResponse = response as? HTTPURLResponse else {
+            throw TranscriptionError.invalidResponse
+        }
+
+        if httpResponse.statusCode != 200 {
+            if let errorResponse = try? JSONDecoder().decode(OpenAIErrorResponse.self, from: data) {
+                if httpResponse.statusCode == 429 { throw TranscriptionError.rateLimited }
+                throw TranscriptionError.apiError(statusCode: httpResponse.statusCode, message: errorResponse.error.message)
+            }
+            throw TranscriptionError.apiError(statusCode: httpResponse.statusCode, message: "Unknown error")
+        }
+
+        // Groq returns {"text": "..."}
+        let groqResponse = try JSONDecoder().decode(GroqTranscriptionResponse.self, from: data)
+        let text = groqResponse.text.trimmingCharacters(in: .whitespacesAndNewlines)
+
+        logger.info("Groq transcription successful: \(text.prefix(50))...")
+        return text
+    }
+
+    // MARK: - OpenRouter (base64 chat completions)
+
+    private func transcribeWithOpenRouter(audioURL: URL, language: String?, apiKey: String, model: String) async throws -> String {
         let audioData: Data
         do {
             audioData = try Data(contentsOf: audioURL)
@@ -98,8 +188,8 @@ final class TranscriptionService {
 
         Rules:
         1. Preserve the original language(s). Do NOT translate.
-        2. Remove filler words, elongated fillers (e.g., \"uuummmm\", \"aaaahhh\"), stutters, and repeated phrases.
-        3. Resolve self-corrections: if the speaker corrects themselves (e.g., \"2+2, no mejor 3+2\"), output ONLY the corrected version.
+        2. Remove filler words, elongated fillers (e.g., "uuummmm", "aaaahhh"), stutters, and repeated phrases.
+        3. Resolve self-corrections: if the speaker corrects themselves (e.g., "2+2, no mejor 3+2"), output ONLY the corrected version.
         4. Remove false starts and abandoned sentence beginnings.
         5. Add punctuation and capitalization for readability.
         6. Keep numbers and expressions as spoken; do not solve them.
@@ -123,14 +213,13 @@ final class TranscriptionService {
             "max_tokens": 1024
         ]
 
-        var request = URLRequest(url: URL(string: whisperEndpoint)!)
+        var request = URLRequest(url: URL(string: STTProvider.openrouter.baseURL)!)
         request.httpMethod = "POST"
         request.setValue("Bearer \(apiKey)", forHTTPHeaderField: "Authorization")
         request.setValue("Hola-AI", forHTTPHeaderField: "X-Title")
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
         request.httpBody = try JSONSerialization.data(withJSONObject: requestBody)
 
-        // Make request
         let (data, response): (Data, URLResponse)
         do {
             (data, response) = try await URLSession.shared.data(for: request)
@@ -139,46 +228,30 @@ final class TranscriptionService {
             throw TranscriptionError.networkError(underlying: error)
         }
 
-        // Check HTTP response
         guard let httpResponse = response as? HTTPURLResponse else {
             throw TranscriptionError.invalidResponse
         }
 
-        // Handle error responses
         if httpResponse.statusCode != 200 {
-            // Try to parse error response
             if let errorResponse = try? JSONDecoder().decode(OpenAIErrorResponse.self, from: data) {
-                if httpResponse.statusCode == 429 {
-                    throw TranscriptionError.rateLimited
-                }
-                throw TranscriptionError.apiError(
-                    statusCode: httpResponse.statusCode,
-                    message: errorResponse.error.message
-                )
+                if httpResponse.statusCode == 429 { throw TranscriptionError.rateLimited }
+                throw TranscriptionError.apiError(statusCode: httpResponse.statusCode, message: errorResponse.error.message)
             }
-            throw TranscriptionError.apiError(
-                statusCode: httpResponse.statusCode,
-                message: "Unknown error"
-            )
+            throw TranscriptionError.apiError(statusCode: httpResponse.statusCode, message: "Unknown error")
         }
 
-        // Parse successful response
-        let responseBody: ChatCompletionResponse
-        do {
-            responseBody = try JSONDecoder().decode(ChatCompletionResponse.self, from: data)
-        } catch {
-            logger.error("Failed to parse response: \(error.localizedDescription)")
-            throw TranscriptionError.invalidResponse
-        }
+        let responseBody = try JSONDecoder().decode(ChatCompletionResponse.self, from: data)
 
         guard let text = responseBody.choices.first?.message.content else {
             throw TranscriptionError.invalidResponse
         }
 
-        logger.info("Transcription successful: \(text.prefix(50))...")
+        logger.info("OpenRouter transcription successful: \(text.prefix(50))...")
         return text
     }
 }
+
+// MARK: - Response Models
 
 private extension TranscriptionService {
     struct ChatCompletionResponse: Decodable {
@@ -189,6 +262,10 @@ private extension TranscriptionService {
             let message: Message
         }
         let choices: [Choice]
+    }
+
+    struct GroqTranscriptionResponse: Decodable {
+        let text: String
     }
 
     func normalizedAudioFormat(from url: URL) -> String {

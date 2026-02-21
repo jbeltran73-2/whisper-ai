@@ -12,7 +12,7 @@ enum TextProcessingError: Error, LocalizedError {
         case .enhancementFailed(let error):
             return "Text enhancement failed: \(error.localizedDescription)"
         case .noAPIKey:
-            return "No OpenRouter API key configured."
+            return "No API key configured for the selected LLM provider."
         case .missingModel:
             return "No prompt enhancement model configured."
         }
@@ -35,7 +35,6 @@ private struct GPTResponse: Decodable {
 @MainActor
 final class TextProcessingService {
     private let logger = Logger(subsystem: "com.holaai.app", category: "TextProcessing")
-    private let gptEndpoint = "https://openrouter.ai/api/v1/chat/completions"
 
     /// Whether to use LLM enhancement (punctuation + capitalization)
     var enableLLMEnhancement: Bool {
@@ -49,6 +48,36 @@ final class TextProcessingService {
         set { UserDefaults.standard.set(newValue, forKey: "enableCodeSwitching") }
     }
 
+    /// LLM provider for dictation text cleanup
+    var dictationLLMProvider: LLMProvider {
+        if let raw = UserDefaults.standard.string(forKey: "dictationLLMProvider"),
+           let provider = LLMProvider(rawValue: raw) {
+            return provider
+        }
+        return .cerebras
+    }
+
+    /// LLM provider for prompt enhancement
+    var promptLLMProvider: LLMProvider {
+        if let raw = UserDefaults.standard.string(forKey: "promptLLMProvider"),
+           let provider = LLMProvider(rawValue: raw) {
+            return provider
+        }
+        return .openrouter
+    }
+
+    /// Model for dictation text cleanup
+    var dictationLLMModel: String? {
+        let value = UserDefaults.standard.string(forKey: "dictationLLMModel")?.trimmingCharacters(in: .whitespacesAndNewlines)
+        return (value?.isEmpty == false) ? value : nil
+    }
+
+    /// Model used for prompt enhancement
+    var promptEnhancementModel: String? {
+        let value = UserDefaults.standard.string(forKey: "promptEnhancementModel")?.trimmingCharacters(in: .whitespacesAndNewlines)
+        return (value?.isEmpty == false) ? value : nil
+    }
+
     init() {
         // Default to enabled
         if UserDefaults.standard.object(forKey: "enableLLMEnhancement") == nil {
@@ -60,10 +89,59 @@ final class TextProcessingService {
         }
     }
 
-    /// Model used for prompt enhancement and text cleanup
-    var promptEnhancementModel: String? {
-        let value = UserDefaults.standard.string(forKey: "promptEnhancementModel")?.trimmingCharacters(in: .whitespacesAndNewlines)
-        return (value?.isEmpty == false) ? value : nil
+    // MARK: - Generic LLM Request
+
+    /// Make a chat completion request to any OpenAI-compatible provider
+    private func makeLLMRequest(provider: LLMProvider, apiKey: String, model: String, messages: [[String: Any]], temperature: Double = 0.1) async throws -> String {
+        let requestBody: [String: Any] = [
+            "model": model,
+            "messages": messages,
+            "max_tokens": 1024,
+            "temperature": temperature
+        ]
+
+        var request = URLRequest(url: URL(string: provider.baseURL)!)
+        request.httpMethod = "POST"
+        request.setValue("Bearer \(apiKey)", forHTTPHeaderField: "Authorization")
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+
+        // Only add X-Title for OpenRouter
+        if provider == .openrouter {
+            request.setValue("Hola-AI", forHTTPHeaderField: "X-Title")
+        }
+
+        request.httpBody = try JSONSerialization.data(withJSONObject: requestBody)
+
+        let (data, response) = try await URLSession.shared.data(for: request)
+
+        guard let httpResponse = response as? HTTPURLResponse, httpResponse.statusCode == 200 else {
+            let statusCode = (response as? HTTPURLResponse)?.statusCode ?? -1
+            throw TextProcessingError.enhancementFailed(underlying: NSError(
+                domain: "TextProcessing",
+                code: statusCode,
+                userInfo: [NSLocalizedDescriptionKey: "API request failed (\(statusCode))"]
+            ))
+        }
+
+        let gptResponse = try JSONDecoder().decode(GPTResponse.self, from: data)
+
+        guard let text = gptResponse.choices.first?.message.content else {
+            throw TextProcessingError.enhancementFailed(underlying: NSError(
+                domain: "TextProcessing",
+                code: -2,
+                userInfo: [NSLocalizedDescriptionKey: "No response from LLM"]
+            ))
+        }
+
+        return text.trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+
+    /// Get API key for a provider, or throw
+    private func requireAPIKey(for provider: LLMProvider) throws -> String {
+        guard let apiKey = KeychainService.shared.getKey(for: provider.keychainAccount), !apiKey.isEmpty else {
+            throw TextProcessingError.noAPIKey
+        }
+        return apiKey
     }
 
     // MARK: - Filler Words
@@ -91,11 +169,6 @@ final class TextProcessingService {
     ]
 
     /// Remove filler words from text
-    /// - Parameters:
-    ///   - text: The transcribed text
-    ///   - language: Optional language code to use specific filler lists
-    ///   - isCodeSwitching: If true, use fillers from all supported languages
-    /// - Returns: Text with filler words removed
     func removeFillers(from text: String, language: String? = nil, isCodeSwitching: Bool = false) -> String {
         var result = text
 
@@ -110,7 +183,6 @@ final class TextProcessingService {
         // Get fillers based on language or use all
         let fillers: [String]
         if isCodeSwitching {
-            // Code-switching mode: use all language fillers
             fillers = englishFillers + spanishFillers
         } else {
             switch language {
@@ -119,7 +191,6 @@ final class TextProcessingService {
             case "en":
                 fillers = englishFillers
             default:
-                // Use both for auto-detect or other languages
                 fillers = englishFillers + spanishFillers
             }
         }
@@ -128,10 +199,7 @@ final class TextProcessingService {
         let sortedFillers = fillers.sorted { $0.count > $1.count }
 
         for filler in sortedFillers {
-            // Create pattern that matches filler as a whole word
-            // Handle various positions: start of text, after punctuation, between words
             let pattern = "(?i)\\b\(NSRegularExpression.escapedPattern(for: filler))\\b[,]?\\s*"
-
             if let regex = try? NSRegularExpression(pattern: pattern, options: []) {
                 let range = NSRange(result.startIndex..., in: result)
                 result = regex.stringByReplacingMatches(in: result, options: [], range: range, withTemplate: "")
@@ -157,24 +225,15 @@ final class TextProcessingService {
 
     // MARK: - LLM Enhancement (Punctuation + Capitalization)
 
-    /// Enhance text with proper punctuation and capitalization using GPT
-    /// - Parameters:
-    ///   - text: Text after filler removal
-    ///   - language: Language for context
-    ///   - isCodeSwitching: If true, handle mixed-language text
-    /// - Returns: Enhanced text with punctuation and capitalization
+    /// Enhance text with proper punctuation and capitalization using LLM
     func enhanceWithLLM(_ text: String, language: String? = nil, isCodeSwitching: Bool = false) async throws -> String {
-        guard let apiKey = KeychainService.shared.getAPIKey(), !apiKey.isEmpty else {
-            throw TextProcessingError.noAPIKey
-        }
-        guard let model = promptEnhancementModel else {
-            throw TextProcessingError.missingModel
-        }
+        let provider = dictationLLMProvider
+        let apiKey = try requireAPIKey(for: provider)
+        let model = dictationLLMModel ?? provider.defaultModel
 
         let systemPrompt: String
 
         if isCodeSwitching {
-            // Code-switching prompt: handle mixed languages
             systemPrompt = """
             You are a multilingual speech-to-text post-processor specialized in code-switching (mixed-language speech). Your job is to clean up transcribed speech that may contain multiple languages within the same utterance.
 
@@ -285,58 +344,23 @@ final class TextProcessingService {
             """
         }
 
-        let requestBody: [String: Any] = [
-            "model": model,
-            "messages": [
-                ["role": "system", "content": systemPrompt],
-                ["role": "user", "content": text]
-            ],
-            "max_tokens": 1024,
-            "temperature": 0.1
+        let messages: [[String: Any]] = [
+            ["role": "system", "content": systemPrompt],
+            ["role": "user", "content": text]
         ]
 
-        var request = URLRequest(url: URL(string: gptEndpoint)!)
-        request.httpMethod = "POST"
-        request.setValue("Bearer \(apiKey)", forHTTPHeaderField: "Authorization")
-        request.setValue("Hola-AI", forHTTPHeaderField: "X-Title")
-        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
-        request.httpBody = try JSONSerialization.data(withJSONObject: requestBody)
+        let enhanced = try await makeLLMRequest(provider: provider, apiKey: apiKey, model: model, messages: messages, temperature: 0.1)
 
-        let (data, response) = try await URLSession.shared.data(for: request)
-
-        guard let httpResponse = response as? HTTPURLResponse, httpResponse.statusCode == 200 else {
-            throw TextProcessingError.enhancementFailed(underlying: NSError(
-                domain: "TextProcessing",
-                code: -1,
-                userInfo: [NSLocalizedDescriptionKey: "API request failed"]
-            ))
-        }
-
-        let gptResponse = try JSONDecoder().decode(GPTResponse.self, from: data)
-
-        guard let enhancedText = gptResponse.choices.first?.message.content else {
-            throw TextProcessingError.enhancementFailed(underlying: NSError(
-                domain: "TextProcessing",
-                code: -2,
-                userInfo: [NSLocalizedDescriptionKey: "No response from GPT"]
-            ))
-        }
-
-        logger.info("LLM enhancement: '\(text.prefix(30))...' -> '\(enhancedText.prefix(30))...'")
-        return enhancedText.trimmingCharacters(in: .whitespacesAndNewlines)
+        logger.info("LLM enhancement (\(provider.rawValue)): '\(text.prefix(30))...' -> '\(enhanced.prefix(30))...'")
+        return enhanced
     }
 
     // MARK: - Prompt Enhancement (Translate to English)
 
     /// Enhance spoken input into a clear English prompt
-    /// - Parameters:
-    ///   - text: Raw transcribed text
-    ///   - language: Optional language hint
-    /// - Returns: Enhanced English prompt
     func enhancePromptToEnglish(_ text: String, language: String? = nil) async throws -> String {
-        guard let apiKey = KeychainService.shared.getAPIKey(), !apiKey.isEmpty else {
-            throw TextProcessingError.noAPIKey
-        }
+        let provider = promptLLMProvider
+        let apiKey = try requireAPIKey(for: provider)
         guard let model = promptEnhancementModel else {
             throw TextProcessingError.missingModel
         }
@@ -356,83 +380,37 @@ final class TextProcessingService {
         \(languageHint)
         """
 
-        let requestBody: [String: Any] = [
-            "model": model,
-            "messages": [
-                ["role": "system", "content": systemPrompt],
-                ["role": "user", "content": text]
-            ],
-            "max_tokens": 1024,
-            "temperature": 0.2
+        let messages: [[String: Any]] = [
+            ["role": "system", "content": systemPrompt],
+            ["role": "user", "content": text]
         ]
 
-        var request = URLRequest(url: URL(string: gptEndpoint)!)
-        request.httpMethod = "POST"
-        request.setValue("Bearer \(apiKey)", forHTTPHeaderField: "Authorization")
-        request.setValue("Hola-AI", forHTTPHeaderField: "X-Title")
-        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
-        request.httpBody = try JSONSerialization.data(withJSONObject: requestBody)
+        let enhanced = try await makeLLMRequest(provider: provider, apiKey: apiKey, model: model, messages: messages, temperature: 0.2)
 
-        let (data, response) = try await URLSession.shared.data(for: request)
-
-        guard let httpResponse = response as? HTTPURLResponse, httpResponse.statusCode == 200 else {
-            throw TextProcessingError.enhancementFailed(underlying: NSError(
-                domain: "TextProcessing",
-                code: -3,
-                userInfo: [NSLocalizedDescriptionKey: "API request failed"]
-            ))
-        }
-
-        let gptResponse = try JSONDecoder().decode(GPTResponse.self, from: data)
-
-        guard let enhancedText = gptResponse.choices.first?.message.content else {
-            throw TextProcessingError.enhancementFailed(underlying: NSError(
-                domain: "TextProcessing",
-                code: -4,
-                userInfo: [NSLocalizedDescriptionKey: "No response from LLM"]
-            ))
-        }
-
-        logger.info("Prompt enhancement: '\(text.prefix(30))...' -> '\(enhancedText.prefix(30))...'")
-        return enhancedText.trimmingCharacters(in: .whitespacesAndNewlines)
+        logger.info("Prompt enhancement (\(provider.rawValue)): '\(text.prefix(30))...' -> '\(enhanced.prefix(30))...'")
+        return enhanced
     }
 
     // MARK: - Full Processing Pipeline
 
     /// Process text through the full pipeline
-    /// - Parameters:
-    ///   - text: Raw transcribed text
-    ///   - language: Optional language code
-    /// - Returns: Processed text
     func processText(_ text: String, language: String? = nil) -> String {
-        // Step 1: Remove filler words (local, fast)
         let afterFillers = removeFillers(from: text, language: language, isCodeSwitching: enableCodeSwitching)
-
-        // For sync version, just return after filler removal
-        // Async version should be used for full processing
         return afterFillers
     }
 
     /// Process text through the full pipeline including LLM enhancement
-    /// - Parameters:
-    ///   - text: Raw transcribed text
-    ///   - language: Optional language code
-    /// - Returns: Fully processed text with punctuation and capitalization
     func processTextAsync(_ text: String, language: String? = nil) async -> String {
         let isCodeSwitching = enableCodeSwitching
 
-        // Step 1: Remove filler words (local, fast)
-        // In code-switching mode, use all language fillers
         let afterFillers = removeFillers(from: text, language: language, isCodeSwitching: isCodeSwitching)
 
-        // Step 2 & 3: Add punctuation and capitalization via LLM
         if enableLLMEnhancement && !afterFillers.isEmpty {
             do {
                 let enhanced = try await enhanceWithLLM(afterFillers, language: language, isCodeSwitching: isCodeSwitching)
                 return enhanced
             } catch {
                 logger.error("LLM enhancement failed, returning filler-removed text: \(error.localizedDescription)")
-                // Fall back to filler-removed text
                 return afterFillers
             }
         }
@@ -441,10 +419,6 @@ final class TextProcessingService {
     }
 
     /// Process text for prompt mode (translate to English + enhance)
-    /// - Parameters:
-    ///   - text: Raw transcribed text
-    ///   - language: Optional language code
-    /// - Returns: Enhanced English prompt
     func processPromptAsync(_ text: String, language: String? = nil) async -> String {
         let afterFillers = removeFillers(from: text, language: language, isCodeSwitching: enableCodeSwitching)
 
@@ -459,17 +433,10 @@ final class TextProcessingService {
     // MARK: - Translation (Dictation)
 
     /// Translate dictation output to English (no prompt formatting)
-    /// - Parameters:
-    ///   - text: Cleaned transcribed text
-    ///   - language: Optional language hint
-    /// - Returns: English translation
     func translateTextToEnglish(_ text: String, language: String? = nil) async -> String {
-        guard let apiKey = KeychainService.shared.getAPIKey(), !apiKey.isEmpty else {
-            return text
-        }
-        guard let model = promptEnhancementModel else {
-            return text
-        }
+        let provider = dictationLLMProvider
+        guard let apiKey = try? requireAPIKey(for: provider) else { return text }
+        let model = dictationLLMModel ?? provider.defaultModel
 
         let languageHint = language.map { "Original language hint: \($0)." } ?? "Detect the original language automatically."
         let systemPrompt = """
@@ -485,33 +452,13 @@ final class TextProcessingService {
         \(languageHint)
         """
 
-        let requestBody: [String: Any] = [
-            "model": model,
-            "messages": [
-                ["role": "system", "content": systemPrompt],
-                ["role": "user", "content": text]
-            ],
-            "max_tokens": 1024,
-            "temperature": 0.1
+        let messages: [[String: Any]] = [
+            ["role": "system", "content": systemPrompt],
+            ["role": "user", "content": text]
         ]
 
-        var request = URLRequest(url: URL(string: gptEndpoint)!)
-        request.httpMethod = "POST"
-        request.setValue("Bearer \(apiKey)", forHTTPHeaderField: "Authorization")
-        request.setValue("Hola-AI", forHTTPHeaderField: "X-Title")
-        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
-        request.httpBody = try? JSONSerialization.data(withJSONObject: requestBody)
-
         do {
-            let (data, response) = try await URLSession.shared.data(for: request)
-            guard let httpResponse = response as? HTTPURLResponse, httpResponse.statusCode == 200 else {
-                return text
-            }
-            let gptResponse = try JSONDecoder().decode(GPTResponse.self, from: data)
-            guard let translated = gptResponse.choices.first?.message.content else {
-                return text
-            }
-            return translated.trimmingCharacters(in: .whitespacesAndNewlines)
+            return try await makeLLMRequest(provider: provider, apiKey: apiKey, model: model, messages: messages)
         } catch {
             logger.error("Translation failed, returning original text: \(error.localizedDescription)")
             return text
