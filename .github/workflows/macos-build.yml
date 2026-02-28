@@ -115,3 +115,19 @@ jobs:
         uses: softprops/action-gh-release@v2
         with:
           files: ${{ env.DMG_PATH }}
+          body: |
+            ## Installation
+
+            ### macOS
+            1. Download the `.dmg` file
+            2. Open the DMG and drag **Hola-AI** to Applications
+            3. On first launch, macOS will show a security warning (the app is not notarized). To fix:
+               - Open **System Settings > Privacy & Security**
+               - Scroll down and click **"Open Anyway"** next to the Hola-AI message
+               - Or run in Terminal: `xattr -cr /Applications/Hola-AI.app`
+            4. Grant Microphone and Accessibility permissions when prompted
+
+            ### Windows
+            1. Download the `.exe` file
+            2. Run it — Windows may show a SmartScreen warning, click **"More info" > "Run anyway"**
+          append_body: true
