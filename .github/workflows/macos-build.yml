@@ -32,6 +32,45 @@ jobs:
           fi
           echo "version=${VERSION}" >> $GITHUB_OUTPUT
 
+      - name: Import signing certificate
+        if: env.CERTIFICATE_P12 != ''
+        env:
+          CERTIFICATE_P12: ${{ secrets.CERTIFICATE_P12 }}
+          CERTIFICATE_PASSWORD: ${{ secrets.CERTIFICATE_PASSWORD }}
+        run: |
+          # Create temporary keychain
+          KEYCHAIN_PATH=$RUNNER_TEMP/app-signing.keychain-db
+          KEYCHAIN_PASSWORD=$(openssl rand -base64 32)
+
+          security create-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
+          security set-keychain-settings -lut 21600 "$KEYCHAIN_PATH"
+          security unlock-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
+
+          # Import certificate
+          echo "$CERTIFICATE_P12" | base64 --decode > $RUNNER_TEMP/certificate.p12
+          security import $RUNNER_TEMP/certificate.p12 \
+            -k "$KEYCHAIN_PATH" \
+            -P "$CERTIFICATE_PASSWORD" \
+            -T /usr/bin/codesign \
+            -T /usr/bin/security
+
+          security set-key-partition-list -S apple-tool:,apple: -k "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
+          security list-keychains -d user -s "$KEYCHAIN_PATH" login.keychain-db
+
+          # Verify
+          IDENTITY=$(security find-identity -v -p codesigning "$KEYCHAIN_PATH" | grep "Developer ID" | head -1 | sed 's/.*"\(.*\)".*/\1/')
+          if [ -z "$IDENTITY" ]; then
+            echo "::warning::No Developer ID identity found in certificate. Falling back to ad-hoc signing."
+            echo "SIGN_IDENTITY=-" >> $GITHUB_ENV
+          else
+            echo "Found signing identity: $IDENTITY"
+            echo "SIGN_IDENTITY=$IDENTITY" >> $GITHUB_ENV
+          fi
+
+      - name: Set fallback signing
+        if: env.SIGN_IDENTITY == ''
+        run: echo "SIGN_IDENTITY=-" >> $GITHUB_ENV
+
       - name: Build release binary
         run: |
           xcodebuild -scheme HolaAI \
@@ -68,7 +107,7 @@ jobs:
       - name: Sign app bundle
         run: |
           # Create entitlements
-          cat > dist/entitlements.plist << 'EOF'
+          cat > dist/entitlements.plist << 'PLIST'
           <?xml version="1.0" encoding="UTF-8"?>
           <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
           <plist version="1.0">
@@ -79,13 +118,16 @@ jobs:
               <true/>
           </dict>
           </plist>
-          EOF
+          PLIST
 
-          # Ad-hoc sign with entitlements
-          codesign --force --deep --sign - \
+          echo "Signing with: $SIGN_IDENTITY"
+          codesign --force --deep --sign "$SIGN_IDENTITY" \
             --entitlements dist/entitlements.plist \
             --options runtime \
             dist/Hola-AI.app
+
+          # Verify signature
+          codesign --verify --verbose dist/Hola-AI.app
 
           # Remove quarantine
           xattr -cr dist/Hola-AI.app
@@ -101,8 +143,38 @@ jobs:
             -srcfolder dist/dmg \
             -ov -format UDZO \
             "dist/${DMG_NAME}"
+
+          # Sign the DMG too if we have a real identity
+          if [[ "$SIGN_IDENTITY" != "-" ]]; then
+            codesign --force --sign "$SIGN_IDENTITY" "dist/${DMG_NAME}"
+          fi
+
           echo "DMG_PATH=dist/${DMG_NAME}" >> $GITHUB_ENV
           echo "DMG_NAME=${DMG_NAME}" >> $GITHUB_ENV
+
+      - name: Notarize DMG
+        if: env.SIGN_IDENTITY != '-'
+        env:
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_PASSWORD: ${{ secrets.APPLE_PASSWORD }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+        run: |
+          if [[ -z "$APPLE_ID" || -z "$APPLE_PASSWORD" || -z "$APPLE_TEAM_ID" ]]; then
+            echo "::warning::Notarization secrets not configured. Skipping notarization."
+            exit 0
+          fi
+
+          echo "Submitting DMG for notarization..."
+          xcrun notarytool submit "$DMG_PATH" \
+            --apple-id "$APPLE_ID" \
+            --password "$APPLE_PASSWORD" \
+            --team-id "$APPLE_TEAM_ID" \
+            --wait
+
+          echo "Stapling notarization ticket..."
+          xcrun stapler staple "$DMG_PATH"
+          xcrun stapler validate "$DMG_PATH"
+          echo "Notarization complete!"
 
       - name: Upload workflow artifact
         uses: actions/upload-artifact@v4
@@ -121,11 +193,7 @@ jobs:
             ### macOS
             1. Download the `.dmg` file
             2. Open the DMG and drag **Hola-AI** to Applications
-            3. On first launch, macOS will show a security warning (the app is not notarized). To fix:
-               - Open **System Settings > Privacy & Security**
-               - Scroll down and click **"Open Anyway"** next to the Hola-AI message
-               - Or run in Terminal: `xattr -cr /Applications/Hola-AI.app`
-            4. Grant Microphone and Accessibility permissions when prompted
+            3. Grant Microphone and Accessibility permissions when prompted
 
             ### Windows
             1. Download the `.exe` file
