@@ -24,6 +24,8 @@
 	<false/>
 	<key>NSMicrophoneUsageDescription</key>
 	<string>Hola-AI needs microphone access to transcribe your speech.</string>
+	<key>NSAppleEventsUsageDescription</key>
+	<string>Hola-AI needs accessibility access to insert transcribed text into other applications.</string>
 	<key>NSPrincipalClass</key>
 	<string>NSApplication</string>
 	<key>NSHighResolutionCapable</key>

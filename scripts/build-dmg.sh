@@ -9,6 +9,8 @@ APP_DIR="${BUILD_DIR}/${BUNDLE_NAME}"
 DMG_DIR="${BUILD_DIR}/dmg"
 DMG_OUTPUT="${BUILD_DIR}/${APP_NAME}-macOS-${VERSION}.dmg"
 PROJECT_DIR="$(cd "$(dirname "$0")/.." && pwd)"
+SIGN_IDENTITY="${SIGN_IDENTITY:--}"
+NOTARY_PROFILE="${NOTARY_PROFILE:-}"
 
 echo "==> Building ${APP_NAME} v${VERSION}..."
 rm -rf "${BUILD_DIR}"
@@ -44,12 +46,38 @@ cp "${PROJECT_DIR}/Info.plist" "${APP_DIR}/Contents/Info.plist"
 /usr/libexec/PlistBuddy -c "Set :CFBundleVersion ${VERSION}" "${APP_DIR}/Contents/Info.plist"
 /usr/libexec/PlistBuddy -c "Set :CFBundleShortVersionString ${VERSION}" "${APP_DIR}/Contents/Info.plist"
 
+# PkgInfo
+echo -n "APPL????" > "${APP_DIR}/Contents/PkgInfo"
+
 [ -f "${PROJECT_DIR}/Sources/HolaAI/Resources/AppIcon.icns" ] && \
     cp "${PROJECT_DIR}/Sources/HolaAI/Resources/AppIcon.icns" "${APP_DIR}/Contents/Resources/AppIcon.icns"
 
 RESOURCE_BUNDLE=$(find "${BUILD_DIR}/xcode/Build/Products" -name "HolaAI_HolaAI.bundle" -type d 2>/dev/null | head -1)
 [ -n "${RESOURCE_BUNDLE}" ] && [ -d "${RESOURCE_BUNDLE}" ] && \
     cp -R "${RESOURCE_BUNDLE}" "${APP_DIR}/Contents/Resources/"
+
+echo "==> Creating entitlements..."
+cat > "${BUILD_DIR}/entitlements.plist" << 'ENTITLEMENTS'
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>com.apple.security.device.audio-input</key>
+    <true/>
+    <key>com.apple.security.automation.apple-events</key>
+    <true/>
+</dict>
+</plist>
+ENTITLEMENTS
+
+echo "==> Signing app bundle (identity: ${SIGN_IDENTITY})..."
+codesign --force --deep --sign "${SIGN_IDENTITY}" \
+    --entitlements "${BUILD_DIR}/entitlements.plist" \
+    --options runtime \
+    "${APP_DIR}"
+
+# Remove quarantine attribute
+xattr -cr "${APP_DIR}"
 
 echo "==> Creating DMG..."
 mkdir -p "${DMG_DIR}"
@@ -60,6 +88,19 @@ hdiutil create -volname "${APP_NAME}" \
     -srcfolder "${DMG_DIR}" \
     -ov -format UDZO \
     "${DMG_OUTPUT}"
+
+# Optional notarization
+if [ -n "${NOTARY_PROFILE}" ]; then
+    if [ "${SIGN_IDENTITY}" = "-" ]; then
+        echo "WARNING: NOTARY_PROFILE is set but SIGN_IDENTITY is ad-hoc. Skipping notarization."
+    else
+        echo "==> Submitting DMG for notarization..."
+        xcrun notarytool submit "${DMG_OUTPUT}" --keychain-profile "${NOTARY_PROFILE}" --wait
+        echo "==> Stapling notarization ticket..."
+        xcrun stapler staple "${DMG_OUTPUT}"
+        xcrun stapler validate "${DMG_OUTPUT}"
+    fi
+fi
 
 echo ""
 echo "==> Done!"
