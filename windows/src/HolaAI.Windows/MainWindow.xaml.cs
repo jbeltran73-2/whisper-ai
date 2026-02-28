@@ -19,9 +19,13 @@ public partial class MainWindow : Window
         InitializeComponent();
         DataContext = _viewModel;
 
+        var apiClient = new ApiClient();
+        var textProcessing = new TextProcessingService(apiClient);
+
         _dictationManager = new DictationManager(
             new AudioCaptureService(),
-            new OpenRouterClient(),
+            apiClient,
+            textProcessing,
             new TextInsertionService(),
             _settingsService);
 

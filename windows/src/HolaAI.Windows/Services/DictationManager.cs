@@ -5,20 +5,21 @@ namespace HolaAI.Windows.Services;
 public sealed class DictationManager : IDisposable
 {
     private readonly AudioCaptureService _audioCaptureService;
-    private readonly OpenRouterClient _openRouterClient;
+    private readonly ApiClient _apiClient;
+    private readonly TextProcessingService _textProcessingService;
     private readonly TextInsertionService _textInsertionService;
     private readonly SettingsService _settingsService;
 
-    private string? _currentAudioPath;
-
     public DictationManager(
         AudioCaptureService audioCaptureService,
-        OpenRouterClient openRouterClient,
+        ApiClient apiClient,
+        TextProcessingService textProcessingService,
         TextInsertionService textInsertionService,
         SettingsService settingsService)
     {
         _audioCaptureService = audioCaptureService;
-        _openRouterClient = openRouterClient;
+        _apiClient = apiClient;
+        _textProcessingService = textProcessingService;
         _textInsertionService = textInsertionService;
         _settingsService = settingsService;
     }
@@ -41,48 +42,55 @@ public sealed class DictationManager : IDisposable
             return;
         }
 
-        _currentAudioPath = await _audioCaptureService.StartAsync(cancellationToken);
+        await _audioCaptureService.StartAsync(cancellationToken);
     }
 
     public async Task StopAsync(DictationOptions options, CancellationToken cancellationToken = default)
     {
         var audioPath = await _audioCaptureService.StopAsync(cancellationToken);
         if (string.IsNullOrWhiteSpace(audioPath))
-        {
             return;
-        }
 
-        var settings = await _settingsService.LoadAsync(cancellationToken);
-        if (string.IsNullOrWhiteSpace(settings.OpenRouterApiKey))
+        try
         {
-            throw new InvalidOperationException("OpenRouter API key is not configured.");
+            var settings = await _settingsService.LoadAsync(cancellationToken);
+
+            // Validate STT API key
+            var sttKey = settings.GetSttApiKey();
+            if (string.IsNullOrWhiteSpace(sttKey))
+                throw new InvalidOperationException($"No API key configured for {settings.SttProvider}. Open Settings to add it.");
+
+            // 1. Transcribe
+            var text = await _apiClient.TranscribeAsync(audioPath, settings, cancellationToken);
+
+            // 2. Process based on intent
+            string processedText;
+            switch (options.Intent)
+            {
+                case DictationIntent.Prompt:
+                    processedText = await _textProcessingService.EnhancePromptAsync(text, settings, cancellationToken);
+                    break;
+
+                case DictationIntent.Transcription:
+                default:
+                    processedText = await _textProcessingService.ProcessTextAsync(text, settings, cancellationToken);
+                    if (options.TranslateToEnglish)
+                    {
+                        processedText = await _textProcessingService.TranslateToEnglishAsync(
+                            processedText, settings, cancellationToken);
+                    }
+                    break;
+            }
+
+            // 3. Insert into active app
+            await _textInsertionService.InsertTextAsync(processedText, cancellationToken);
+            TranscriptionReady?.Invoke(processedText);
         }
-
-        var text = await _openRouterClient.TranscribeAndCleanAsync(
-            audioPath,
-            settings.OpenRouterApiKey,
-            settings.SttModel,
-            cancellationToken);
-
-        if (options.Intent == DictationIntent.Prompt)
+        finally
         {
-            text = await _openRouterClient.EnhancePromptToEnglishAsync(
-                text,
-                settings.OpenRouterApiKey,
-                settings.PromptModel,
-                cancellationToken);
+            // Clean up temp audio file
+            try { File.Delete(audioPath); } catch { /* ignore */ }
         }
-        else if (options.TranslateToEnglish)
-        {
-            text = await _openRouterClient.TranslateToEnglishAsync(
-                text,
-                settings.OpenRouterApiKey,
-                settings.PromptModel,
-                cancellationToken);
-        }
-
-        await _textInsertionService.InsertTextAsync(text, cancellationToken);
-        TranscriptionReady?.Invoke(text);
     }
 
     public void Dispose()
