@@ -3,6 +3,7 @@ import SwiftUI
 /// A floating overlay with a toggle button for recording
 struct RecordingOverlayView: View {
     let isRecording: Bool
+    let isTranscribing: Bool
     let audioLevel: Float
     let intent: DictationIntent
     let translateToEnglish: Bool
@@ -13,28 +14,42 @@ struct RecordingOverlayView: View {
     var onCopyLastText: (() -> Void)?
     var onClose: (() -> Void)?
 
+    @State private var isHovering = false
+
     var body: some View {
         VStack(alignment: .leading, spacing: 6) {
             HStack {
                 Spacer()
                 closeButton
+                    .opacity(isHovering ? 1 : 0)
+                    .animation(.easeInOut(duration: 0.15), value: isHovering)
             }
             HStack(spacing: 10) {
                 // Main toggle button (microphone)
                 Button(action: {
-                    onToggle?(DictationOptions(intent: intent, translateToEnglish: translateToEnglish))
+                    if !isTranscribing {
+                        onToggle?(DictationOptions(intent: intent, translateToEnglish: translateToEnglish))
+                    }
                 }) {
                     ZStack {
                         Circle()
-                            .fill(isRecording ? Color.red : Color.blue)
+                            .fill(isTranscribing ? Color.orange : (isRecording ? Color.red : Color.blue))
                             .frame(width: 36, height: 36)
 
-                        Image(systemName: isRecording ? "stop.fill" : "mic.fill")
-                            .font(.system(size: 16, weight: .semibold))
-                            .foregroundColor(.white)
+                        if isTranscribing {
+                            ProgressView()
+                                .progressViewStyle(.circular)
+                                .scaleEffect(0.6)
+                                .colorScheme(.dark)
+                        } else {
+                            Image(systemName: isRecording ? "stop.fill" : "mic.fill")
+                                .font(.system(size: 16, weight: .semibold))
+                                .foregroundColor(.white)
+                        }
                     }
                 }
                 .buttonStyle(.plain)
+                .disabled(isTranscribing)
 
                 if isRecording {
                     AudioLevelView(level: audioLevel)
@@ -46,13 +61,13 @@ struct RecordingOverlayView: View {
                     systemName: "sparkles",
                     onColor: Color.orange
                 )
-                .disabled(isRecording)
+                .disabled(isRecording || isTranscribing)
 
                 FlagToggle(
                     isOn: translateToggleBinding,
                     onColor: Color.blue
                 )
-                .disabled(isRecording || intent == .prompt)
+                .disabled(isRecording || isTranscribing || intent == .prompt)
                 .opacity(intent == .prompt ? 0.5 : 1.0)
 
                 Button(action: {
@@ -77,6 +92,9 @@ struct RecordingOverlayView: View {
             .background(controlClusterBackground)
         }
         .padding(8)
+        .onHover { hovering in
+            isHovering = hovering
+        }
     }
 
     private var controlClusterBackground: some View {
@@ -304,6 +322,7 @@ struct AudioLevelView: View {
 #Preview("Idle") {
     RecordingOverlayView(
         isRecording: false,
+        isTranscribing: false,
         audioLevel: 0,
         intent: .transcription,
         translateToEnglish: false,
@@ -315,10 +334,23 @@ struct AudioLevelView: View {
 #Preview("Recording") {
     RecordingOverlayView(
         isRecording: true,
+        isTranscribing: false,
         audioLevel: 0.6,
         intent: .prompt,
         translateToEnglish: true,
         canCopyLastText: true
+    )
+    .padding()
+}
+
+#Preview("Transcribing") {
+    RecordingOverlayView(
+        isRecording: false,
+        isTranscribing: true,
+        audioLevel: 0,
+        intent: .transcription,
+        translateToEnglish: false,
+        canCopyLastText: false
     )
     .padding()
 }

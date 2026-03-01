@@ -8,6 +8,7 @@ final class RecordingOverlayController {
     private var hostingView: NSHostingView<RecordingOverlayView>?
 
     private var isRecording = false
+    private var isTranscribing = false
     private var audioLevel: Float = 0
     private var intent: DictationIntent = .transcription
     private var translateToEnglish: Bool = false
@@ -40,6 +41,7 @@ final class RecordingOverlayController {
 
         let overlayView = RecordingOverlayView(
             isRecording: isRecording,
+            isTranscribing: isTranscribing,
             audioLevel: audioLevel,
             intent: intent,
             translateToEnglish: translateToEnglish,
@@ -116,6 +118,12 @@ final class RecordingOverlayController {
         }
     }
 
+    /// Update the transcribing state (show spinner)
+    func setTranscribing(_ transcribing: Bool) {
+        isTranscribing = transcribing
+        updateView()
+    }
+
     /// Update the audio level visualization
     func updateAudioLevel(_ level: Float) {
         audioLevel = level
@@ -131,6 +139,7 @@ final class RecordingOverlayController {
     private func updateView() {
         hostingView?.rootView = RecordingOverlayView(
             isRecording: isRecording,
+            isTranscribing: isTranscribing,
             audioLevel: audioLevel,
             intent: intent,
             translateToEnglish: translateToEnglish,

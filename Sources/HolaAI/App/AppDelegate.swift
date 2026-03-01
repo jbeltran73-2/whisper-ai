@@ -151,6 +151,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             self?.updateCommandModeState(mode)
         }
 
+        dictationManager.onTranscribingChange = { [weak self] isTranscribing in
+            self?.recordingOverlay.setTranscribing(isTranscribing)
+        }
+
         dictationManager.onError = { [weak self] error in
             self?.showError(error)
         }
